@@ -2,7 +2,6 @@ from py_tools.connections.db.mysql import DBManager
 from py_tools.connections.db.mysql.orm_model import BaseOrmTableWithTS
 from sqlalchemy import String, Boolean, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
-
 from config import config
 
 
@@ -20,106 +19,73 @@ class User(BaseOrmTableWithTS):
     reason: Mapped[str] = mapped_column(String(100), nullable=True)
 
     def __repr__(self):
-        return (
-            f"<User(telegram_id={self.telegram_id}, "
-            f"telegram_name={self.telegram_name}, "
-            f"emby_name={self.emby_name}, "
-            f"emby_id={self.emby_id}, "
-            f"is_admin={self.is_admin}, "
-            f"is_whitelist={self.is_whitelist}, "
-            f"enable_register={self.enable_register}, "
-            f"ban_time={self.ban_time})>"
-        )
+        return (f"<User(telegram_id={self.telegram_id}, "
+                f"telegram_name={self.telegram_name}, "
+                f"emby_name={self.emby_name}, "
+                f"emby_id={self.emby_id}, "
+                f"is_admin={self.is_admin}, "
+                f"is_whitelist={self.is_whitelist}, "
+                f"enable_register={self.enable_register}, "
+                f"ban_time={self.ban_time})>")
 
-    def __str__(self):
-        return self.__repr__()
+    def _check_permission(self, condition: bool, exception_msg: str):
+        """通用的权限检查方法"""
+        if not condition:
+            raise Exception(exception_msg)
 
     def check_create_invite_code(self) -> bool:
-        """
-        判断当前用户是否能创建普通邀请码（通常需要管理员权限）。
-        """
-        return self.is_admin
+        """判断当前用户是否能创建普通邀请码"""
+        self._check_permission(self.is_admin, "您没有权限创建邀请码。")
+        return True
 
     def check_create_whitelist_code(self) -> bool:
-        """
-        判断当前用户是否能创建白名单邀请码（通常需要管理员权限）。
-        """
-        return self.is_admin
+        """判断当前用户是否能创建白名单邀请码"""
+        self._check_permission(self.is_admin, "您没有权限创建白名单邀请码。")
+        return True
 
     def check_emby_register(self):
-        """
-        检查是否允许用户创建 Emby 账号。
-        """
-        if not self.enable_register:
-            raise Exception("您当前无权限创建 Emby 账号。")
-        if self.emby_id is not None:
-            raise Exception("该用户已拥有 Emby 账号，无法重复创建。")
+        """检查是否允许用户创建 Emby 账号"""
+        self._check_permission(self.enable_register, "您当前无权限创建 Emby 账号。")
+        self._check_permission(self.emby_id is None, "该用户已拥有 Emby 账号，无法重复创建。")
 
     def check_use_redeem_code(self):
-        """
-        检查是否可使用普通注册邀请码。
-        """
-        if self.emby_id is not None:
-            raise Exception("该用户已拥有 Emby 账号，无法再次使用注册邀请码。")
-        if self.enable_register:
-            raise Exception("该用户已经具备创建 Emby 账号的资格，无需再次使用邀请码。")
+        """检查是否可使用普通注册邀请码"""
+        self._check_permission(self.emby_id is None, "该用户已拥有 Emby 账号，无法再次使用注册邀请码。")
+        self._check_permission(not self.enable_register, "该用户已经具备创建 Emby 账号的资格，无需再次使用邀请码。")
 
     def check_use_whitelist_code(self):
-        """
-        检查是否可使用白名单邀请码。
-        """
-        if self.emby_id is None:
-            raise Exception("该用户尚未拥有 Emby 账号，无法使用白名单邀请码。")
-        if self.is_whitelist:
-            raise Exception("该用户已在白名单，无需再次使用。")
+        """检查是否可使用白名单邀请码"""
+        self._check_permission(self.emby_id is not None, "该用户尚未拥有 Emby 账号，无法使用白名单邀请码。")
+        self._check_permission(not self.is_whitelist, "该用户已在白名单，无需再次使用。")
 
     def check_emby_ban(self):
-        """
-        检查是否可对该用户进行 Emby 禁用。
-        """
-        if not self.has_emby_account():
-            raise Exception("该用户尚未绑定 Emby 账号，无法禁用。")
-        if self.is_emby_baned():
-            raise Exception("该用户的 Emby 账号已被禁用，无需重复操作。")
+        """检查是否可对该用户进行 Emby 禁用"""
+        self._check_permission(self.has_emby_account(), "该用户尚未绑定 Emby 账号，无法禁用。")
+        self._check_permission(not self.is_emby_baned(), "该用户的 Emby 账号已被禁用，无需重复操作。")
 
     def check_emby_unban(self):
-        """
-        检查是否可对该用户进行 Emby 账号解禁。
-        """
-        if not self.has_emby_account():
-            raise Exception("该用户尚未绑定 Emby 账号，无法执行解禁。")
-        if not self.is_emby_baned():
-            raise Exception("该用户的 Emby 账号当前未被禁用，无需解禁。")
+        """检查是否可对该用户进行 Emby 账号解禁"""
+        self._check_permission(self.has_emby_account(), "该用户尚未绑定 Emby 账号，无法执行解禁。")
+        self._check_permission(self.is_emby_baned(), "该用户的 Emby 账号当前未被禁用，无需解禁。")
 
     def check_set_emby_config(self):
-        """
-        检查是否可修改 Emby 全局配置（仅管理员可操作）。
-        """
-        if not self.is_bot_admin():
-            raise Exception("您没有管理员权限，无法修改 Emby 全局配置。")
+        """检查是否可修改 Emby 全局配置（仅管理员可操作）"""
+        self._check_permission(self.is_bot_admin(), "您没有管理员权限，无法修改 Emby 全局配置。")
 
     def is_bot_admin(self) -> bool:
-        """
-        判断当前用户是否是 Bot 管理员（由 config.admin_list 控制）。
-        """
+        """判断当前用户是否是 Bot 管理员（由 config.admin_list 控制）"""
         return self.telegram_id in config.admin_list
 
     def has_emby_account(self) -> bool:
-        """
-        判断当前用户是否已经绑定了 Emby 账号。
-        """
+        """判断当前用户是否已经绑定了 Emby 账号"""
         return self.emby_id is not None
 
     def is_emby_baned(self) -> bool:
-        """
-        判断当前 Emby 账号是否已被禁用（ban_time > 0）。
-        """
+        """判断当前 Emby 账号是否已被禁用（ban_time > 0）"""
         return self.ban_time and self.ban_time > 0
 
     def emby_ban_info(self) -> tuple[int, str]:
-        """
-        返回该用户被 ban 的时间戳与原因，用于外部查询。
-        """
+        """返回该用户被 ban 的时间戳与原因，用于外部查询"""
         return self.ban_time, self.reason
 
 
