@@ -39,11 +39,13 @@ class CommandHandler:
         parts = message.text.strip().split(" ")
         return parts[1:] if len(parts) > 1 else []
 
-    def ensure_args(self, min_len: int, usage: str):
+    @staticmethod
+    def ensure_args(min_len: int, usage: str):
         """
         装饰器：检查消息参数是否足够，如果不足，则回复提示并终止函数调用。
         """
         def decorator(func):
+
             @functools.wraps(func)
             async def wrapper(self, message, *args, **kwargs):
                 # 从消息中解析参数
@@ -366,7 +368,7 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="查询失败")
 
-    @ensure_args(2, "/register_until <时间: YYYY-MM-DD HH:MM:SS>")
+    @ensure_args(2, "/register_until 2023-10-01 12:00:00")
     async def register_until(self, message: Message, args: list[str]):
         """
         /register_until <时间: YYYY-MM-DD HH:MM:SS>
