@@ -1,4 +1,5 @@
 import logging
+import functools
 from datetime import datetime
 
 from pyrogram import filters
@@ -38,14 +39,25 @@ class CommandHandler:
         parts = message.text.strip().split(" ")
         return parts[1:] if len(parts) > 1 else []
 
-    async def _ensure_args(self, message: Message, args: list, min_len: int, usage: str):
+    def ensure_args(self, min_len: int, usage: str):
         """
-        确保命令行参数长度足够，不足则回复用法说明。
+        装饰器：检查消息参数是否足够，如果不足，则回复提示并终止函数调用。
         """
-        if len(args) < min_len:
-            await self._reply_html(message, f"参数不足，请参考用法：\n<code>{usage}</code>")
-            return False
-        return True
+        def decorator(func):
+            @functools.wraps(func)
+            async def wrapper(self, message, *args, **kwargs):
+                # 从消息中解析参数
+                parsed_args = self._parse_args(message)
+                if len(parsed_args) < min_len:
+                    await self._reply_html(
+                        message,
+                        f"参数不足，请参考用法：\n<code>{usage}</code>"
+                    )
+                    return
+                # 将解析好的参数传递给目标函数，避免在函数内部再调用 _parse_args
+                return await func(self, message, parsed_args, *args, **kwargs)
+            return wrapper
+        return decorator
 
     async def _send_error(self, message: Message, error: Exception, prefix: str = "操作失败"):
         """
@@ -55,14 +67,12 @@ class CommandHandler:
         await self._reply_html(message, f"{prefix}：{error}")
 
     # =============== 各类命令逻辑 ===============
-
-    async def create_user(self, message: Message):
+    @ensure_args(1, "/create <用户名>")
+    async def create_user(self, message: Message, args: list[str]):
         """
         /create <用户名>
+        使用装饰器后 args 已经保证至少有一个参数。
         """
-        args = self._parse_args(message)
-        if not await self._ensure_args(message, args, 1, "/create <用户名>"):
-            return
 
         emby_name = args[0]
         try:
@@ -111,13 +121,11 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="查询失败")
 
-    async def use_code(self, message: Message):
+    @ensure_args(1, "/use_code <邀请码>")
+    async def use_code(self, message: Message, args: list[str]):
         """
         /use_code <邀请码>
         """
-        args = self._parse_args(message)
-        if not await self._ensure_args(message, args, 1, "/use_code <邀请码>"):
-            return
 
         code = args[0]
         telegram_id = message.from_user.id
@@ -358,14 +366,12 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="查询失败")
 
-    async def register_until(self, message: Message):
+    @ensure_args(2, "/register_until <时间: YYYY-MM-DD HH:MM:SS>")
+    async def register_until(self, message: Message, args: list[str]):
         """
         /register_until <时间: YYYY-MM-DD HH:MM:SS>
         限时开放注册
         """
-        args = self._parse_args(message)
-        if not await self._ensure_args(message, args, 2, "/register_until 2023-10-01 12:00:00"):
-            return
 
         time_str = " ".join(args)
         try:
@@ -379,14 +385,12 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="开放注册失败")
 
-    async def register_amount(self, message: Message):
+    @ensure_args(1, "/register_amount <人数>")
+    async def register_amount(self, message: Message, args: list[str]):
         """
         /register_amount <人数>
         开放指定数量的注册名额
         """
-        args = self._parse_args(message)
-        if not await self._ensure_args(message, args, 1, "/register_amount <人数>"):
-            return
 
         try:
             amount = int(args[0])
