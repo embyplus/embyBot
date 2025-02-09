@@ -5,14 +5,16 @@ services:
     restart: always
     ports:
       - "3306:3306"
+    env_file: ".env"
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: emby-bot-db
-      MYSQL_USER: embyplus
-      MYSQL_PASSWORD: embyplus
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+      #MYSQL_USER: ${DB_USER}  #如果db_use为root，将这一条注释
+      MYSQL_PASSWORD: ${DB_PASS}
+      MYSQL_INITDB_SKIP_TZINFO: ${TIMEZONE}
     volumes:
-      - ./data/db:/var/lib/mysql
-      - ./data/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/data/db:/var/lib/mysql
+      # - ./data/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - emby-network
 
@@ -24,9 +26,9 @@ services:
       - GID=100 # The GID to run emby as (default 2)
       - GIDLIST=100 # A comma-separated list of additional GIDs to run emby as (default: 2)
     volumes:
-      - ./emby/programdata:/config # Configuration directory
-      - ./emby/tvshows:/mnt/share1 # Media directory
-      - ./emby/movies:/mnt/share2 # Media directory
+      - ./backend/emby/programdata:/config # Configuration directory
+      - ./backend/emby/tvshows:/mnt/share1 # Media directory
+      - ./backend/emby/movies:/mnt/share2 # Media directory
     ports:
       - 8096:8096 # HTTP port
       - 8920:8920 # HTTPS port
@@ -36,4 +38,3 @@ services:
 
 networks:
   emby-network:
-
