@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime
 
 import pytz
@@ -42,13 +43,34 @@ async def main():
             await conn.run_sync(BaseOrmTable.metadata.create_all)
 
     def _init_logger():
-        import logging
-        logging.basicConfig(
-            format="%(levelname)s [%(asctime)s] %(name)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-            level=config.log_level,
-            filename="default.log",
+        # 创建格式化器
+        formatter = logging.Formatter(
+            fmt="%(levelname)s [%(asctime)s] %(name)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S"
         )
+
+        # 创建根日志器并设置级别
+        logger = logging.getLogger()
+        logger.setLevel(config.log_level)
+
+        # 创建文件 Handler，将日志写入 default.log
+        file_handler = logging.FileHandler("default.log", encoding="utf-8")
+        file_handler.setLevel(config.log_level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        # 可选：添加控制台 Handler（便于调试时直接查看输出）
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(config.log_level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+
+        # 设置 SQLAlchemy 相关日志器的级别
+        sa_logger = logging.getLogger("sqlalchemy.engine")
+        sa_logger.setLevel(logging.INFO)
+        # 确保 SQLAlchemy 日志也添加到文件 Handler 上（通常只需设置根日志器即可，但显式添加可以确保）
+        if not sa_logger.handlers:
+            sa_logger.addHandler(file_handler)
 
     def _init_tz():
         if config.timezone:
