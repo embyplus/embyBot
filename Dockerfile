@@ -3,9 +3,10 @@ LABEL authors="TTLYTT0"
 
 RUN apk add git build-base
 
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+COPY requirements.txt /opt
+RUN pip install -r /opt/requirements.txt
 
-COPY . .
+COPY . /opt
 
+WORKDIR /opt
 ENTRYPOINT ["python", "app.py"]
