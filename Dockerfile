@@ -6,6 +6,8 @@ RUN apk add git build-base
 COPY requirements.txt /opt
 RUN pip install -r /opt/requirements.txt
 
+RUN ln -sf /dev/stdout /opt/default.log
+
 COPY . /opt
 
 WORKDIR /opt
