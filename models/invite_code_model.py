@@ -1,9 +1,11 @@
+import logging
 import enum
 from py_tools.connections.db.mysql import DBManager
 from py_tools.connections.db.mysql.orm_model import BaseOrmTableWithTS
 from sqlalchemy import String, BigInteger, Boolean, Enum
 from sqlalchemy.orm import Mapped, mapped_column
 
+logger = logging.getLogger(__name__)
 
 class InviteCodeType(enum.Enum):
     REGISTER = 'register'  # 注册邀请码
@@ -31,3 +33,5 @@ class InviteCode(BaseOrmTableWithTS):
 
 class InviteCodeOrm(DBManager):
     orm_table = InviteCode
+
+logger.info("InviteCode model initialized")

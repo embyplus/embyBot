@@ -13,12 +13,15 @@ from config import config
 from models.invite_code_model import InviteCodeType
 from services import UserService
 
+logger = logging.getLogger(__name__)
+
 
 class CommandHandler:
     def __init__(self, bot_client: BotClient, user_service: UserService):
         self.bot_client = bot_client
         self.user_service = user_service
         self.code_to_message_id = {}
+        logger.info("CommandHandler initialized")
 
     # =============== 辅助方法 ===============
 
@@ -51,7 +54,7 @@ class CommandHandler:
         """
         统一的异常捕获后回复方式。
         """
-        logging.error(error)
+        logger.error(f"{prefix}：{error}", exc_info=True)
         await self._reply_html(message, f"{prefix}：{error}")
 
     # =============== 各类命令逻辑 ===============
@@ -336,6 +339,7 @@ class CommandHandler:
                 )
             except Exception as e:
                 await callback_query.answer(f"操作失败：{str(e)}", show_alert=True)
+                logger.error(f"Callback query failed: {e}", exc_info=True)
 
     async def count(self, message: Message):
         """

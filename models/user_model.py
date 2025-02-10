@@ -1,3 +1,4 @@
+import logging
 from py_tools.connections.db.mysql import DBManager
 from py_tools.connections.db.mysql.orm_model import BaseOrmTableWithTS
 from sqlalchemy import String, Boolean, BigInteger
@@ -5,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from config import config
 
+logger = logging.getLogger(__name__)
 
 class User(BaseOrmTableWithTS):
     __tablename__ = 'user'
@@ -101,3 +103,5 @@ class User(BaseOrmTableWithTS):
 
 class UserOrm(DBManager):
     orm_table = User
+
+logger.info("User model initialized")

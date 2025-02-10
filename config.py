@@ -1,8 +1,11 @@
-from dotenv import load_dotenv
+import logging
 import os
+from dotenv import load_dotenv
 
 # 加载 .env 文件
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 class Config:
     def __init__(self):
@@ -26,6 +29,9 @@ class Config:
         self.router_list = {}
         self.group_members = {}
 
+        logger.info(f"Configuration loaded")
+
 
 # 实例化并提供配置对象
 config = Config()
+logger.debug(f"Admin list: {config.admin_list}")
