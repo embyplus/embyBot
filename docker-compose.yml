@@ -1,10 +1,10 @@
 services:
   db:
-    image: mysql
+    image: mysql:8.0
     container_name: emby-db
     restart: always
-    ports:
-      - "3306:3306"
+    # ports:
+    #   - "3306:3306"
     env_file: ".env"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
@@ -15,6 +15,22 @@ services:
     volumes:
       - ./backend/data/db:/var/lib/mysql
       # - ./data/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 30s
+      timeout: 10s
+      retries: 5    
+    networks:
+      - emby-network
+  
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: phpmyadmin
+    restart: always
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on: 
+      - db
     networks:
       - emby-network
 
