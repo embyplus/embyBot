@@ -3,14 +3,9 @@ services:
     image: mysql:8
     container_name: emby-db
     restart: always
-    ports:
-      - "127.0.0.1:3306:3306"
-    env_file: ".env"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
       MYSQL_DATABASE: ${DB_NAME}
-      #MYSQL_USER: ${DB_USER}  #如果db_use为root，将这一条注释
-      MYSQL_PASSWORD: ${DB_PASS}
       MYSQL_INITDB_SKIP_TZINFO: ${TIMEZONE}
     healthcheck:
       test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
@@ -34,11 +29,33 @@ services:
       - ./backend/emby/tvshows:/mnt/share1 # Media directory
       - ./backend/emby/movies:/mnt/share2 # Media directory
     ports:
-      - 8096:8096 # HTTP port
-      - 8920:8920 # HTTPS port
+      - "8096:8096" # HTTP port
+      # - 8920:8920 # HTTPS port
     restart: always
     networks:
       - emby-network
+
+  phpmyadmin:
+    image: phpmyadmin
+    environment:
+      PMA_USER: ${DB_USER}
+      PMA_PASSWORD: ${DB_PASS}
+    ports:
+      - 127.0.0.1:8080:80
+    networks:
+      - emby-network
+    depends_on:
+      - db
+
+  bot:
+    build: .
+    env_file: ".env"
+    networks:
+      - emby-network
+    depends_on:
+      - db
+      - emby
+
 
 networks:
   emby-network:
