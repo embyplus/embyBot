@@ -1,10 +1,10 @@
 services:
   db:
-    image: mysql
+    image: mysql:8
     container_name: emby-db
     restart: always
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     env_file: ".env"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
@@ -12,6 +12,10 @@ services:
       #MYSQL_USER: ${DB_USER}  #如果db_use为root，将这一条注释
       MYSQL_PASSWORD: ${DB_PASS}
       MYSQL_INITDB_SKIP_TZINFO: ${TIMEZONE}
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
     volumes:
       - ./backend/data/db:/var/lib/mysql
       # - ./data/init.sql:/docker-entrypoint-initdb.d/init.sql
