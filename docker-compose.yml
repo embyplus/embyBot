@@ -3,18 +3,15 @@ services:
     image: mysql:8.0
     container_name: emby-db
     restart: always
-    # ports:
-    #   - "3306:3306"
+    ports:
+      - "127.0.0.1:3306:3306"
     env_file: ".env"
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASS}
       MYSQL_DATABASE: ${DB_NAME}
-      #MYSQL_USER: ${DB_USER}  #如果db_use为root，将这一条注释
-      MYSQL_PASSWORD: ${DB_PASS}
       MYSQL_INITDB_SKIP_TZINFO: ${TIMEZONE}
     volumes:
       - ./backend/data/db:/var/lib/mysql
-      # - ./data/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 30s
@@ -33,6 +30,10 @@ services:
       - db
     networks:
       - emby-network
+    env_file: ".env"
+    environment:
+      PMA_USER: ${DB_USER}
+      PMA_PASSWORD: ${DB_PASS}
 
 networks:
   emby-network:
