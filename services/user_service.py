@@ -33,7 +33,7 @@ class UserService:
             default_user = User(
                 telegram_id=telegram_id,
                 is_admin=telegram_id in config.admin_list,
-                telegram_name=config.group_members.get(telegram_id, {}).get('username'),
+                telegram_name=config.group_members.get(telegram_id, {}).username,
             )
             user_id = await UserOrm().add(default_user)
             user = default_user
