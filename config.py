@@ -7,6 +7,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 class Config:
     def __init__(self):
         self.timezone = os.getenv("TIMEZONE")
@@ -14,7 +15,9 @@ class Config:
         self.bot_token = os.getenv("BOT_TOKEN")
         self.api_id = os.getenv("API_ID")
         self.api_hash = os.getenv("API_HASH")
-        self.telegram_group_ids = list(map(int, os.getenv("TELEGRAM_GROUP_ID").split(",")))
+        self.telegram_group_ids = list(
+            map(int, os.getenv("TELEGRAM_GROUP_ID").split(","))
+        )
         self.emby_url = os.getenv("EMBY_URL")
         self.emby_api = os.getenv("EMBY_API_KEY")
         self.api_url = os.getenv("API_URL")

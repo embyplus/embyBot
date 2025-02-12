@@ -8,16 +8,23 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
-class User(BaseOrmTableWithTS):
-    __tablename__ = 'user'
 
-    telegram_id: Mapped[int] = mapped_column(BigInteger, index=True, unique=True, nullable=False)
+class User(BaseOrmTableWithTS):
+    __tablename__ = "user"
+
+    telegram_id: Mapped[int] = mapped_column(
+        BigInteger, index=True, unique=True, nullable=False
+    )
     telegram_name: Mapped[str] = mapped_column(String(100), nullable=True)
     emby_name: Mapped[str] = mapped_column(String(50), nullable=True)
-    emby_id: Mapped[str] = mapped_column(String(50), index=True, unique=True, nullable=True)
+    emby_id: Mapped[str] = mapped_column(
+        String(50), index=True, unique=True, nullable=True
+    )
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_whitelist: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    enable_register: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    enable_register: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
     ban_time: Mapped[int] = mapped_column(nullable=True)
     reason: Mapped[str] = mapped_column(String(100), nullable=True)
 
@@ -103,5 +110,6 @@ class User(BaseOrmTableWithTS):
 
 class UserOrm(DBManager):
     orm_table = User
+
 
 logger.info("User model initialized")

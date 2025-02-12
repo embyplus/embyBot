@@ -36,7 +36,9 @@ async def get_user_telegram_id(client, message):
         try:
             user = await client.get_users(telegram_username)
             telegram_id = user.id
-            logger.debug(f"Telegram ID resolved from username {telegram_username}: {telegram_id}")
+            logger.debug(
+                f"Telegram ID resolved from username {telegram_username}: {telegram_id}"
+            )
         except UsernameNotOccupied:
             error_message = f"❌ 用户名 @{telegram_username} 不存在"
             logger.warning(f"Username not occupied: {telegram_username}")
@@ -48,7 +50,10 @@ async def get_user_telegram_id(client, message):
             await message.reply(error_message)
             return None
         except Exception as e:
-            logger.error(f"Error getting user ID from username {telegram_username}: {e}", exc_info=True)
+            logger.error(
+                f"Error getting user ID from username {telegram_username}: {e}",
+                exc_info=True,
+            )
             return None
 
     return telegram_id
