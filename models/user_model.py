@@ -8,16 +8,27 @@ from config import config
 
 logger = logging.getLogger(__name__)
 
-class User(BaseOrmTableWithTS):
-    __tablename__ = 'user'
 
-    telegram_id: Mapped[int] = mapped_column(BigInteger, index=True, unique=True, nullable=False)
+class User(BaseOrmTableWithTS):
+    __tablename__ = "user"
+
+    telegram_id: Mapped[int] = mapped_column(
+        BigInteger, index=True, unique=True, nullable=False
+    )
     telegram_name: Mapped[str] = mapped_column(String(100), nullable=True)
     emby_name: Mapped[str] = mapped_column(String(50), nullable=True)
-    emby_id: Mapped[str] = mapped_column(String(50), index=True, unique=True, nullable=True)
-    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_whitelist: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    enable_register: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    emby_id: Mapped[str] = mapped_column(
+        String(50), index=True, unique=True, nullable=True
+    )
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    is_whitelist: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    enable_register: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
     ban_time: Mapped[int] = mapped_column(nullable=True)
     reason: Mapped[str] = mapped_column(String(100), nullable=True)
 
@@ -56,7 +67,9 @@ class User(BaseOrmTableWithTS):
         if self.emby_id is not None:
             raise Exception("该用户已拥有 Emby 账号，无法再次使用注册邀请码。")
         if self.enable_register:
-            raise Exception("该用户已经具备创建 Emby 账号的资格，无需再次使用邀请码。")
+            raise Exception(
+                "该用户已经具备创建 Emby 账号的资格，无需再次使用邀请码。"
+            )
 
     def check_use_whitelist_code(self) -> None:
         """检查是否可使用白名单邀请码。"""
@@ -103,5 +116,6 @@ class User(BaseOrmTableWithTS):
 
 class UserOrm(DBManager):
     orm_table = User
+
 
 logger.info("User model initialized")

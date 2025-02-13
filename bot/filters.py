@@ -14,7 +14,7 @@ async def user_in_group_on_filter(filter, client, update) -> bool:
     if config.group_members and telegram_id in config.group_members:
         logger.debug(f"User {telegram_id} is in group")
         return True
-    if config.channel_members and telegram_id in  config.channel_members:
+    if config.channel_members and telegram_id in config.channel_members:
         logger.debug(f"User {telegram_id} is in channel")
         return True
 
@@ -31,7 +31,10 @@ async def admin_user_on_filter(filter, client, update) -> bool:
             logger.debug(f"User {telegram_id} is an admin")
             return True
     except Exception as e:
-        logger.error(f"Error checking admin status for user {telegram_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error checking admin status for user {telegram_id}: {e}",
+            exc_info=True,
+        )
         return False
 
     logger.debug(f"User {telegram_id} is not an admin")
@@ -47,13 +50,18 @@ async def emby_user_on_filter(filter, client, update) -> bool:
             logger.debug(f"User {telegram_id} is an Emby user")
             return True
     except Exception as e:
-        logger.error(f"Error checking Emby status for user {telegram_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error checking Emby status for user {telegram_id}: {e}",
+            exc_info=True,
+        )
         return False
 
     logger.debug(f"User {telegram_id} is not an Emby user")
     return False
 
 
-user_in_group_on_filter = create(user_in_group_on_filter, 'user_in_group_on_filter')
-admin_user_on_filter = create(admin_user_on_filter, 'admin_user_on_filter')
-emby_user_on_filter = create(emby_user_on_filter, 'emby_user_on_filter')
+user_in_group_on_filter = create(
+    user_in_group_on_filter, "user_in_group_on_filter"
+)
+admin_user_on_filter = create(admin_user_on_filter, "admin_user_on_filter")
+emby_user_on_filter = create(emby_user_on_filter, "emby_user_on_filter")

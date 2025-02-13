@@ -6,15 +6,23 @@ from sqlalchemy.orm import mapped_column, Mapped
 
 logger = logging.getLogger(__name__)
 
-class Config(BaseOrmTableWithTS):
-    __tablename__ = 'config'
 
-    total_register_user: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    register_public_user: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    register_public_time: Mapped[int] = mapped_column(BigInteger, nullable=True)
+class Config(BaseOrmTableWithTS):
+    __tablename__ = "config"
+
+    total_register_user: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    register_public_user: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    register_public_time: Mapped[int] = mapped_column(
+        BigInteger, nullable=True
+    )
 
 
 class ConfigOrm(DBManager):
     orm_table = Config
+
 
 logger.info("Config model initialized")

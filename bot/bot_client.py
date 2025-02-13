@@ -7,17 +7,14 @@ logger = logging.getLogger(__name__)
 
 class BotClient:
     def __init__(
-            self,
-            api_id: str,
-            api_hash: str,
-            bot_token: str,
-            name="emby_bot",
+        self,
+        api_id: str,
+        api_hash: str,
+        bot_token: str,
+        name="emby_bot",
     ):
         self.client = Client(
-            name=name,
-            api_id=api_id,
-            api_hash=api_hash,
-            bot_token=bot_token
+            name=name, api_id=api_id, api_hash=api_hash, bot_token=bot_token
         )
         logger.info(f"Bot client initialized with name: {name}")
 

@@ -3,7 +3,11 @@ import logging
 from datetime import datetime
 
 import pytz
-from py_tools.connections.db.mysql import DBManager, BaseOrmTable, SQLAlchemyManager
+from py_tools.connections.db.mysql import (
+    DBManager,
+    BaseOrmTable,
+    SQLAlchemyManager,
+)
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -100,7 +104,9 @@ async def setup_bot() -> BotClient:
 
 async def fetch_group_members(bot_client: BotClient) -> None:
     """获取群组成员并更新配置。"""
-    members_in_group = await bot_client.get_group_members(config.telegram_group_ids)
+    members_in_group = await bot_client.get_group_members(
+        config.telegram_group_ids
+    )
     for group_members in members_in_group.values():
         for telegram_id in group_members:
             config.group_members[telegram_id] = group_members[telegram_id]
@@ -126,7 +132,9 @@ async def main() -> None:
     emby_router_api = EmbyRouterAPI(config.api_url, config.api_key)
     command_handler = CommandHandler(
         bot_client=bot_client,
-        user_service=UserService(emby_api=emby_api, emby_router_api=emby_router_api),
+        user_service=UserService(
+            emby_api=emby_api, emby_router_api=emby_router_api
+        ),
     )
     logger.info("Emby API 和命令处理器初始化完成。")
 

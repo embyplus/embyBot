@@ -64,7 +64,8 @@ class CommandHandler:
                 parsed_args = self._parse_args(message)
                 if len(parsed_args) < min_len:
                     await self._reply_html(
-                        message, f"参数不足，请参考用法：\n<code>{usage}</code>"
+                        message,
+                        f"参数不足，请参考用法：\n<code>{usage}</code>",
                     )
                     return
                 # 将解析好的参数传递给目标函数，避免在函数内部再调用 _parse_args
@@ -103,7 +104,9 @@ class CommandHandler:
                     f"✅ 创建用户成功。\n初始密码：<code>{default_password}</code>",
                 )
             else:
-                await self._reply_html(message, "❌ 创建用户失败，请稍后重试。")
+                await self._reply_html(
+                    message, "❌ 创建用户失败，请稍后重试。"
+                )
         except Exception as e:
             await self._send_error(message, e, prefix="创建用户失败")
 
@@ -112,7 +115,9 @@ class CommandHandler:
         /info
         如果是私聊，查看自己信息；如果群里回复某人，则查看对方信息
         """
-        telegram_id = await get_user_telegram_id(self.bot_client.client, message)
+        telegram_id = await get_user_telegram_id(
+            self.bot_client.client, message
+        )
         try:
             user, emby_info = await self.user_service.emby_info(telegram_id)
             last_active = (
@@ -124,7 +129,9 @@ class CommandHandler:
                 emby_info.get("DateCreated", "")
             )
             ban_status = (
-                "正常" if (user.ban_time is None or user.ban_time == 0) else "已禁用"
+                "正常"
+                if (user.ban_time is None or user.ban_time == 0)
+                else "已禁用"
             )
 
             reply_text = (
@@ -167,7 +174,9 @@ class CommandHandler:
                     message, "✅ 邀请码使用成功，您已获得创建账号资格"
                 )
             else:
-                await self._reply_html(message, "✅ 邀请码使用成功，您已获得白名单资格")
+                await self._reply_html(
+                    message, "✅ 邀请码使用成功，您已获得白名单资格"
+                )
 
             # 如果该邀请码在bot中记录了消息，需要删除
             if self.code_to_message_id.get(code):
@@ -193,7 +202,9 @@ class CommandHandler:
                     f"✅ 密码重置成功。\n新密码：<code>{default_password}</code>",
                 )
             else:
-                await self._reply_html(message, "❌ 密码重置失败，请稍后重试。")
+                await self._reply_html(
+                    message, "❌ 密码重置失败，请稍后重试。"
+                )
         except Exception as e:
             await self._send_error(message, e, prefix="密码重置失败")
 
@@ -217,7 +228,9 @@ class CommandHandler:
                 message.from_user.id, num
             )
             for code_obj in code_list:
-                message_text = f"📌 邀请码：\n点击复制👉<code>{code_obj.code}</code>"
+                message_text = (
+                    f"📌 邀请码：\n点击复制👉<code>{code_obj.code}</code>"
+                )
                 if message.reply_to_message is not None:
                     await self.bot_client.client.send_message(
                         chat_id=message.from_user.id,
@@ -232,7 +245,10 @@ class CommandHandler:
                     await self._reply_html(message, "✅ 已发送邀请码")
                 else:
                     msg = await self._reply_html(message, message_text)
-                    self.code_to_message_id[code_obj.code] = (message.chat.id, msg.id)
+                    self.code_to_message_id[code_obj.code] = (
+                        message.chat.id,
+                        msg.id,
+                    )
         except Exception as e:
             await self._send_error(message, e, prefix="创建邀请码失败")
 
@@ -256,9 +272,7 @@ class CommandHandler:
                 message.from_user.id, num
             )
             for code_obj in code_list:
-                message_text = (
-                    f"📌 白名单邀请码：\n点击复制👉<code>{code_obj.code}</code>"
-                )
+                message_text = f"📌 白名单邀请码：\n点击复制👉<code>{code_obj.code}</code>"
                 if message.reply_to_message is not None:
                     await self.bot_client.client.send_message(
                         chat_id=message.from_user.id,
@@ -273,7 +287,10 @@ class CommandHandler:
                     await self._reply_html(message, "✅ 已发送邀请码")
                 else:
                     msg = await self._reply_html(message, message_text)
-                    self.code_to_message_id[code_obj.code] = (message.chat.id, msg.id)
+                    self.code_to_message_id[code_obj.code] = (
+                        message.chat.id,
+                        msg.id,
+                    )
         except Exception as e:
             await self._send_error(message, e, prefix="创建白名单邀请码失败")
 
@@ -285,11 +302,16 @@ class CommandHandler:
         reason = args[0] if args else "管理员禁用"
 
         operator_id = message.from_user.id
-        telegram_id = await get_user_telegram_id(self.bot_client.client, message)
+        telegram_id = await get_user_telegram_id(
+            self.bot_client.client, message
+        )
         try:
-            if await self.user_service.emby_ban(telegram_id, reason, operator_id):
+            if await self.user_service.emby_ban(
+                telegram_id, reason, operator_id
+            ):
                 await self._reply_html(
-                    message, f"✅ 已禁用用户 <code>{telegram_id}</code> 的Emby账号"
+                    message,
+                    f"✅ 已禁用用户 <code>{telegram_id}</code> 的Emby账号",
                 )
             else:
                 await self._reply_html(message, "❌ 禁用失败，请稍后重试。")
@@ -301,11 +323,14 @@ class CommandHandler:
         /unban_emby (群里需回复某人或手动指定)
         """
         operator_id = message.from_user.id
-        telegram_id = await get_user_telegram_id(self.bot_client.client, message)
+        telegram_id = await get_user_telegram_id(
+            self.bot_client.client, message
+        )
         try:
             if await self.user_service.emby_unban(telegram_id, operator_id):
                 await self._reply_html(
-                    message, f"✅ 已解禁用户 <code>{telegram_id}</code> 的Emby账号"
+                    message,
+                    f"✅ 已解禁用户 <code>{telegram_id}</code> 的Emby账号",
                 )
             else:
                 await self._reply_html(message, "❌ 解禁失败，请稍后重试。")
@@ -319,8 +344,9 @@ class CommandHandler:
         """
         try:
             telegram_id = message.from_user.id
-            router_list = config.router_list or await self.user_service.get_router_list(
-                telegram_id
+            router_list = (
+                config.router_list
+                or await self.user_service.get_router_list(telegram_id)
             )
             # 缓存到 config 中，减少重复获取
             if router_list and not config.router_list:
@@ -328,7 +354,9 @@ class CommandHandler:
 
             user_router = await self.user_service.get_user_router(telegram_id)
             user_router_index = user_router.get("index", "")
-            message_text = f"当前线路：<code>{user_router_index}</code>\n请选择线路："
+            message_text = (
+                f"当前线路：<code>{user_router_index}</code>\n请选择线路："
+            )
             message_buttons = []
 
             for router in router_list:
@@ -336,7 +364,9 @@ class CommandHandler:
                 name = router.get("name")
                 # 已选线路高亮
                 button_text = (
-                    f"🔵 {name}" if index == user_router_index else f"⚪ {name}"
+                    f"🔵 {name}"
+                    if index == user_router_index
+                    else f"⚪ {name}"
                 )
                 message_buttons.append(
                     [
@@ -347,7 +377,9 @@ class CommandHandler:
                 )
 
             keyboard = InlineKeyboardMarkup(message_buttons)
-            await self._reply_html(message, message_text, reply_markup=keyboard)
+            await self._reply_html(
+                message, message_text, reply_markup=keyboard
+            )
         except Exception as e:
             await self._send_error(message, e, prefix="查询失败")
 
@@ -371,7 +403,9 @@ class CommandHandler:
             for new_member in message.new_chat_members:
                 config.group_members[new_member.id] = new_member
 
-    async def handle_callback_query(self, client, callback_query: CallbackQuery):
+    async def handle_callback_query(
+        self, client, callback_query: CallbackQuery
+    ):
         """
         回调按钮事件统一处理，如切换线路。
         """
@@ -384,7 +418,8 @@ class CommandHandler:
                     return
 
                 selected_router = next(
-                    (r for r in config.router_list if r["index"] == index), None
+                    (r for r in config.router_list if r["index"] == index),
+                    None,
                 )
                 if not selected_router:
                     await callback_query.answer("线路不存在")
@@ -399,7 +434,9 @@ class CommandHandler:
                     "生效可能会有 30 秒延迟，请耐心等候。"
                 )
             except Exception as e:
-                await callback_query.answer(f"操作失败：{str(e)}", show_alert=True)
+                await callback_query.answer(
+                    f"操作失败：{str(e)}", show_alert=True
+                )
                 logger.error(f"Callback query failed: {e}", exc_info=True)
 
     async def count(self, message: Message):
@@ -410,7 +447,9 @@ class CommandHandler:
         try:
             count_data = self.user_service.emby_count()
             if not count_data:
-                return await self._reply_html(message, "❌ 查询失败：无法获取数据")
+                return await self._reply_html(
+                    message, "❌ 查询失败：无法获取数据"
+                )
 
             await self._reply_html(
                 message,
@@ -435,10 +474,13 @@ class CommandHandler:
             time = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
             now = datetime.now()
             if time < now:
-                return await self._reply_html(message, "❌ 时间必须晚于当前时间")
+                return await self._reply_html(
+                    message, "❌ 时间必须晚于当前时间"
+                )
 
             await self.user_service.set_emby_config(
-                message.from_user.id, register_public_time=int(time.timestamp())
+                message.from_user.id,
+                register_public_time=int(time.timestamp()),
             )
             await self._reply_html(
                 message, f"✅ 已开放注册，截止时间：<code>{time_str}</code>"
@@ -513,13 +555,17 @@ class CommandHandler:
             await self.info(message)
 
         @self.bot_client.client.on_message(
-            filters.private & filters.command("use_code") & user_in_group_on_filter
+            filters.private
+            & filters.command("use_code")
+            & user_in_group_on_filter
         )
         async def c_use_code(client, message):
             await self.use_code(message)
 
         @self.bot_client.client.on_message(
-            filters.private & filters.command("create") & user_in_group_on_filter
+            filters.private
+            & filters.command("create")
+            & user_in_group_on_filter
         )
         async def c_create_user(client, message):
             await self.create_user(message)
