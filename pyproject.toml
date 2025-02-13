@@ -15,6 +15,7 @@ dependencies = [
     "requests==2.31.0",
     "shortuuid~=1.0.13",
     "sqlalchemy~=2.0.20",
+    "telethon>=1.38.1",
     "tgcrypto==1.2.5",
     "urllib3==2.3.0",
 ]
