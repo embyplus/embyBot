@@ -8,7 +8,7 @@ from services import UserService
 logger = logging.getLogger(__name__)
 
 
-async def user_in_group_on_filter(filter, client, update) -> bool:
+async def user_in_group_on_filter(_, __, update) -> bool:
     user = update.from_user or update.sender_chat
     telegram_id = user.id
     if config.group_members and telegram_id in config.group_members:
@@ -22,7 +22,7 @@ async def user_in_group_on_filter(filter, client, update) -> bool:
     return False
 
 
-async def admin_user_on_filter(filter, client, update) -> bool:
+async def admin_user_on_filter(_, __, update) -> bool:
     user = update.from_user or update.sender_chat
     telegram_id = user.id
     try:
@@ -32,7 +32,8 @@ async def admin_user_on_filter(filter, client, update) -> bool:
             return True
     except Exception as e:
         logger.error(
-            f"Error checking admin status for user {telegram_id}: {e}", exc_info=True
+            f"Error checking admin status for user {telegram_id}: {e}",
+            exc_info=True
         )
         return False
 
@@ -40,7 +41,7 @@ async def admin_user_on_filter(filter, client, update) -> bool:
     return False
 
 
-async def emby_user_on_filter(filter, client, update) -> bool:
+async def emby_user_on_filter(_, __, update) -> bool:
     user = update.from_user or update.sender_chat
     telegram_id = user.id
     try:
@@ -50,7 +51,8 @@ async def emby_user_on_filter(filter, client, update) -> bool:
             return True
     except Exception as e:
         logger.error(
-            f"Error checking Emby status for user {telegram_id}: {e}", exc_info=True
+            f"Error checking Emby status for user {telegram_id}: {e}",
+            exc_info=True
         )
         return False
 
@@ -58,6 +60,7 @@ async def emby_user_on_filter(filter, client, update) -> bool:
     return False
 
 
-user_in_group_on_filter = create(user_in_group_on_filter, "user_in_group_on_filter")
+user_in_group_on_filter = create(user_in_group_on_filter,
+                                 "user_in_group_on_filter")
 admin_user_on_filter = create(admin_user_on_filter, "admin_user_on_filter")
 emby_user_on_filter = create(emby_user_on_filter, "emby_user_on_filter")

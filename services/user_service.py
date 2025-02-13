@@ -18,6 +18,38 @@ from models.user_model import UserOrm
 logger = logging.getLogger(__name__)
 
 
+async def first_or_create_emby_config() -> Config:
+    """获取或创建 Emby 配置。"""
+    emby_config = await ConfigOrm().query_one(conds=[Config.id == 1])
+    if not emby_config:
+        emby_config = Config(
+            register_public_user=0, register_public_time=0,
+            total_register_user=0
+        )
+        await ConfigOrm().add(emby_config)
+    return emby_config
+
+
+async def _check_register_permission(user: User,
+                                     emby_config: Config) -> bool:
+    """检查用户是否有权限注册 Emby 账号"""
+    enable_register = user.enable_register
+    if not enable_register and emby_config.register_public_user > 0:
+        enable_register = True
+    if (
+            not enable_register
+            and emby_config.register_public_time > 0
+            and (datetime.now().timestamp()
+                 < emby_config.register_public_time)
+    ):
+        enable_register = True
+    if 0 < emby_config.register_public_time < datetime.now().timestamp():
+        await ConfigOrm().update(
+            values={"register_public_time": 0}, conds=[Config.id == 1]
+        )
+    return enable_register
+
+
 class UserService:
     """用户与 Emby 相关的业务逻辑层"""
 
@@ -28,12 +60,14 @@ class UserService:
     @staticmethod
     async def get_or_create_user_by_telegram_id(telegram_id: int) -> User:
         """通过 telegram_id 从数据库获取用户，如果不存在则创建一个默认用户"""
-        user = await UserOrm().query_one(conds=[User.telegram_id == telegram_id])
+        user = await UserOrm().query_one(
+            conds=[User.telegram_id == telegram_id])
         if not user:
             default_user = User(
                 telegram_id=telegram_id,
                 is_admin=telegram_id in config.admin_list,
-                telegram_name=config.group_members.get(telegram_id, {}).username
+                telegram_name=config.group_members.get(telegram_id,
+                                                       {}).username
                 if config.group_members.get(telegram_id)
                 else None,
             )
@@ -65,13 +99,14 @@ class UserService:
         return user
 
     async def _emby_create_user(
-        self, telegram_id: int, username: str, password: str
+            self, telegram_id: int, username: str, password: str
     ) -> User:
         """内部使用：真正调用 Emby API 创建用户，并设置初始密码"""
         user = await self.get_or_create_user_by_telegram_id(telegram_id)
         emby_user = self.emby_api.create_user(username)
         if not emby_user or not emby_user.get("Id"):
-            raise Exception("在 Emby 系统中创建账号失败，请检查 Emby 服务是否正常。")
+            raise Exception(
+                "在 Emby 系统中创建账号失败，请检查 Emby 服务是否正常。")
 
         emby_id = emby_user["Id"]
         user.emby_id = emby_id
@@ -99,7 +134,7 @@ class UserService:
         return [f"epw-{str(shortuuid.uuid())}" for _ in range(num)]
 
     async def create_invite_code(
-        self, telegram_id: int, count: int = 1
+            self, telegram_id: int, count: int = 1
     ) -> List[InviteCode]:
         """创建普通邀请码，需检测用户是否有权限"""
         user = await self.must_get_user(telegram_id)
@@ -108,14 +143,15 @@ class UserService:
 
         code_objs = [
             InviteCode(
-                code=code, telegram_id=telegram_id, code_type=InviteCodeType.REGISTER
+                code=code, telegram_id=telegram_id,
+                code_type=InviteCodeType.REGISTER
             )
             for code in self.gen_register_code(count)
         ]
         return await InviteCodeOrm().bulk_add(code_objs)
 
     async def create_whitelist_code(
-        self, telegram_id: int, count: int = 1
+            self, telegram_id: int, count: int = 1
     ) -> List[InviteCode]:
         """创建白名单邀请码，需检测用户是否有权限"""
         user = await self.must_get_user(telegram_id)
@@ -124,7 +160,8 @@ class UserService:
 
         code_objs = [
             InviteCode(
-                code=code, telegram_id=telegram_id, code_type=InviteCodeType.WHITELIST
+                code=code, telegram_id=telegram_id,
+                code_type=InviteCodeType.WHITELIST
             )
             for code in self.gen_whitelist_code(count)
         ]
@@ -142,59 +179,35 @@ class UserService:
             )
         return user, emby_user
 
-    async def first_or_create_emby_config(self) -> Config:
-        """获取或创建 Emby 配置。"""
-        emby_config = await ConfigOrm().query_one(conds=[Config.id == 1])
-        if not emby_config:
-            emby_config = Config(
-                register_public_user=0, register_public_time=0, total_register_user=0
-            )
-            await ConfigOrm().add(emby_config)
-        return emby_config
-
     async def emby_create_user(
-        self, telegram_id: int, username: str, password: str
+            self, telegram_id: int, username: str, password: str
     ) -> User:
         """创建 Emby 用户（外部调用入口），先判断各种配置是否允许注册，然后调用内部的 _emby_create_user"""
         user = await self.get_or_create_user_by_telegram_id(telegram_id)
         if user.has_emby_account():
-            raise Exception("该 Telegram 用户已经绑定过 Emby 账号，无法重复创建。")
+            raise Exception(
+                "该 Telegram 用户已经绑定过 Emby 账号，无法重复创建。")
 
-        emby_config = await self.first_or_create_emby_config()
+        emby_config = await first_or_create_emby_config()
         if not emby_config:
             raise Exception("未找到 Emby 配置，无法创建账号。")
 
-        if not await self._check_register_permission(user, emby_config):
+        if not await _check_register_permission(user, emby_config):
             raise Exception("当前没有可用的注册权限或名额，创建账号被拒绝。")
 
         async with ConfigOrm().transaction() as session:
-            if not user.enable_register and emby_config.register_public_user > 0:
+            if (not user.enable_register
+                    and emby_config.register_public_user > 0):
                 emby_config.register_public_user -= 1
 
             emby_config.total_register_user += 1
-            new_user = await self._emby_create_user(telegram_id, username, password)
+            new_user = await self._emby_create_user(telegram_id, username,
+                                                    password)
 
             session.add(new_user)
             session.add(emby_config)
             await session.commit()
         return new_user
-
-    async def _check_register_permission(self, user: User, emby_config: Config) -> bool:
-        """检查用户是否有权限注册 Emby 账号"""
-        enable_register = user.enable_register
-        if not enable_register and emby_config.register_public_user > 0:
-            enable_register = True
-        if (
-            not enable_register
-            and emby_config.register_public_time > 0
-            and datetime.now().timestamp() < emby_config.register_public_time
-        ):
-            enable_register = True
-        if 0 < emby_config.register_public_time < datetime.now().timestamp():
-            await ConfigOrm().update(
-                values={"register_public_time": 0}, conds=[Config.id == 1]
-            )
-        return enable_register
 
     async def redeem_code(self, telegram_id: int, code: str):
         """使用邀请码，分为普通注册邀请码和白名单邀请码"""
@@ -207,7 +220,8 @@ class UserService:
         # 使用事务块，并通过行锁防止并发问题
         async with InviteCodeOrm().transaction() as session:
             # 构造 SELECT 语句，并加上 FOR UPDATE 行锁
-            stmt = select(InviteCode).where(InviteCode.code == code).with_for_update()
+            stmt = select(InviteCode).where(
+                InviteCode.code == code).with_for_update()
             result = await session.execute(stmt)
             valid_code = result.scalars().first()
 
@@ -239,7 +253,8 @@ class UserService:
 
         return valid_code
 
-    async def reset_password(self, telegram_id: int, password: str = "") -> bool:
+    async def reset_password(self, telegram_id: int,
+                             password: str = "") -> bool:
         """重置用户的 Emby 密码。"""
         user = await self.must_get_emby_user(telegram_id)
         try:
@@ -251,7 +266,8 @@ class UserService:
             return False
 
     async def emby_ban(
-        self, telegram_id: int, reason: str, operator_telegram_id: Optional[int] = None
+            self, telegram_id: int, reason: str,
+            operator_telegram_id: Optional[int] = None
     ) -> bool:
         """禁用用户"""
         if operator_telegram_id is not None:
@@ -276,7 +292,7 @@ class UserService:
             return False
 
     async def emby_unban(
-        self, telegram_id: int, operator_telegram_id: Optional[int] = None
+            self, telegram_id: int, operator_telegram_id: Optional[int] = None
     ) -> bool:
         """解禁用户"""
         if operator_telegram_id is not None:
@@ -300,16 +316,16 @@ class UserService:
             return False
 
     async def set_emby_config(
-        self,
-        telegram_id: int,
-        register_public_user: Optional[int] = None,
-        register_public_time: Optional[int] = None,
+            self,
+            telegram_id: int,
+            register_public_user: Optional[int] = None,
+            register_public_time: Optional[int] = None,
     ) -> Config:
         """设置 Emby 注册相关配置，如公共注册名额和公共注册截止时间"""
         user = await self.must_get_user(telegram_id)
         user.check_set_emby_config()
 
-        emby_config = await self.first_or_create_emby_config()
+        emby_config = await first_or_create_emby_config()
         if not emby_config:
             raise Exception("未找到全局 Emby 配置，无法设置。")
 
@@ -336,10 +352,12 @@ class UserService:
         user = await self.must_get_emby_user(telegram_id)
         return self.emby_router_api.query_user_route(user.emby_id)
 
-    async def update_user_router(self, telegram_id: int, new_index: str) -> bool:
+    async def update_user_router(self, telegram_id: int,
+                                 new_index: str) -> bool:
         """更新用户线路信息"""
         user = await self.must_get_emby_user(telegram_id)
-        return self.emby_router_api.update_user_route(str(user.emby_id), str(new_index))
+        return self.emby_router_api.update_user_route(str(user.emby_id),
+                                                      str(new_index))
 
     async def get_router_list(self, telegram_id: int) -> List[Dict]:
         """获取所有可用线路"""

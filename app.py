@@ -3,12 +3,13 @@ import logging
 from datetime import datetime
 
 import pytz
-from py_tools.connections.db.mysql import DBManager, BaseOrmTable, SQLAlchemyManager
+from py_tools.connections.db.mysql import DBManager, BaseOrmTable, \
+    SQLAlchemyManager
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from bot.command import CommandHandler
 from bot.bot_client import BotClient
-from bot.commands import CommandHandler
 from config import config
 from core.emby_api import EmbyApi, EmbyRouterAPI
 from services import UserService
@@ -20,7 +21,8 @@ logger = logging.getLogger(__name__)
 async def create_database_if_not_exists() -> None:
     """创建数据库。"""
     engine_without_db = create_async_engine(
-        f"mysql+asyncmy://{config.db_user}:{config.db_pass}@{config.db_host}:{config.db_port}/",
+        f"mysql+asyncmy://{config.db_user}:{config.db_pass}@"
+        f"{config.db_host}:{config.db_port}/",
         echo=True,
     )
     async with engine_without_db.begin() as conn:
@@ -69,6 +71,20 @@ def _init_logger() -> None:
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
+    # 创建 logger 并设置级别
+    logger_i = logging.getLogger()
+    logger_i.setLevel(config.log_level)
+
+    # 文件处理器，记录到 default.log
+    file_handler = logging.FileHandler("default.log")
+    file_handler.setFormatter(formatter)
+    logger_i.addHandler(file_handler)
+
+    # 控制台处理器，打印到终端
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger_i.addHandler(console_handler)
+
 
 def _init_tz() -> None:
     """初始化时区设置。"""
@@ -97,7 +113,8 @@ async def setup_bot() -> BotClient:
 
 async def fetch_group_members(bot_client: BotClient) -> None:
     """获取群组成员并更新配置。"""
-    members_in_group = await bot_client.get_group_members(config.telegram_group_ids)
+    members_in_group = await bot_client.get_group_members(
+        config.telegram_group_ids)
     for group_members in members_in_group.values():
         for telegram_id in group_members:
             config.group_members[telegram_id] = group_members[telegram_id]
@@ -121,9 +138,10 @@ async def main() -> None:
     # 初始化 Emby API 和命令处理器
     emby_api = EmbyApi(config.emby_url, config.emby_api)
     emby_router_api = EmbyRouterAPI(config.api_url, config.api_key)
-    command_handler = CommandHandler(
+    CommandHandler(
         bot_client=bot_client,
-        user_service=UserService(emby_api=emby_api, emby_router_api=emby_router_api),
+        user_service=UserService(emby_api=emby_api,
+                                 emby_router_api=emby_router_api),
     )
     logger.info("Emby API 和命令处理器初始化完成。")
 
@@ -133,7 +151,6 @@ async def main() -> None:
         logger.info("群组成员信息已更新。")
 
         # 设置命令并进入空闲状态
-        command_handler.setup_commands()
         logger.info("命令处理器设置完成，Bot 进入运行状态。")
         await bot_client.idle()
 

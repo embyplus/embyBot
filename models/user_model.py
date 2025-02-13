@@ -1,4 +1,5 @@
 import logging
+
 from py_tools.connections.db.mysql import DBManager
 from py_tools.connections.db.mysql.orm_model import BaseOrmTableWithTS
 from sqlalchemy import String, Boolean, BigInteger
@@ -20,8 +21,10 @@ class User(BaseOrmTableWithTS):
     emby_id: Mapped[str] = mapped_column(
         String(50), index=True, unique=True, nullable=True
     )
-    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_whitelist: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False,
+                                           nullable=False)
+    is_whitelist: Mapped[bool] = mapped_column(Boolean, default=False,
+                                               nullable=False)
     enable_register: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
@@ -63,7 +66,8 @@ class User(BaseOrmTableWithTS):
         if self.emby_id is not None:
             raise Exception("该用户已拥有 Emby 账号，无法再次使用注册邀请码。")
         if self.enable_register:
-            raise Exception("该用户已经具备创建 Emby 账号的资格，无需再次使用邀请码。")
+            raise Exception(
+                "该用户已经具备创建 Emby 账号的资格，无需再次使用邀请码。")
 
     def check_use_whitelist_code(self) -> None:
         """检查是否可使用白名单邀请码。"""

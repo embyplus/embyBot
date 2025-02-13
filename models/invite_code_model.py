@@ -1,5 +1,6 @@
-import logging
 import enum
+import logging
+
 from py_tools.connections.db.mysql import DBManager
 from py_tools.connections.db.mysql.orm_model import BaseOrmTableWithTS
 from sqlalchemy import String, BigInteger, Boolean, Enum
@@ -22,12 +23,15 @@ class InviteCode(BaseOrmTableWithTS):
     code: Mapped[str] = mapped_column(
         String(50), index=True, unique=True, nullable=False
     )
-    telegram_id: Mapped[int] = mapped_column(BigInteger, index=True, nullable=False)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, index=True,
+                                             nullable=False)
     code_type: Mapped[InviteCodeType] = mapped_column(
         Enum(InviteCodeType), nullable=False
     )
-    is_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    used_time: Mapped[int] = mapped_column(BigInteger, default=None, nullable=True)
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False,
+                                          nullable=False)
+    used_time: Mapped[int] = mapped_column(BigInteger, default=None,
+                                           nullable=True)
     used_user_id: Mapped[int] = mapped_column(
         BigInteger, default=None, nullable=True, index=True
     )

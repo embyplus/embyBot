@@ -1,4 +1,5 @@
 import logging
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,9 @@ class EmbyApi:
         self.api_key: str = emby_api
         self.timeout: int = timeout
         logger.info(
-            f"EmbyApi initialized with URL: {self.base_url}, timeout: {self.timeout}"
+            f"EmbyApi initialized with URL: "
+            f"{self.base_url}, timeout: "
+            f"{self.timeout}"
         )
 
     def _request(self, method: str, path: str, data=None, params=None):
@@ -44,7 +47,11 @@ class EmbyApi:
 
         url = f"{self.base_url}{path}"
         logger.debug(
-            f"Making {method} request to {url} with params: {params}, data: {data}"
+            f"Making "
+            f"{method} request to "
+            f"{url} with params: "
+            f"{params}, data: "
+            f"{data}"
         )
         try:
             if method.upper() == "GET":
@@ -53,7 +60,8 @@ class EmbyApi:
                 )
             elif method.upper() == "POST":
                 response = requests.post(
-                    url, params=params, json=data, timeout=self.timeout, headers=headers
+                    url, params=params, json=data, timeout=self.timeout,
+                    headers=headers
                 )
             else:
                 raise Exception(f"暂不支持的 HTTP 方法: {method}")
@@ -64,18 +72,21 @@ class EmbyApi:
             raise Exception("请求 Emby 服务器超时，请稍后重试或检查网络连接。")
         except requests.exceptions.ConnectionError as e:
             # 连接异常
-            logger.error(f"Failed to connect to Emby server: {e}", exc_info=True)
+            logger.error(f"Failed to connect to Emby server: {e}",
+                         exc_info=True)
             raise Exception(f"无法连接到 Emby 服务器: {str(e)}")
         except requests.exceptions.RequestException as e:
             # 其他 requests 异常
             logger.error(
-                f"An unknown error occurred while requesting Emby: {e}", exc_info=True
+                f"An unknown error occurred while requesting Emby: {e}",
+                exc_info=True
             )
             raise Exception(f"请求 Emby 时发生未知错误: {str(e)}")
 
         try:
             response.raise_for_status()
-            logger.debug(f"Request successful, status code: {response.status_code}")
+            logger.debug(
+                f"Request successful, status code: {response.status_code}")
         except Exception as e:
             logger.error(f"Emby API request failed: {e}", exc_info=True)
             raise Exception(f"Emby API 请求失败")
@@ -93,7 +104,8 @@ class EmbyApi:
             return self._request("GET", path)
         except Exception as e:
             logger.error(
-                f"Failed to get user with Emby ID {emby_id}: {e}", exc_info=True
+                f"Failed to get user with Emby ID {emby_id}: {e}",
+                exc_info=True
             )
             raise
 
@@ -109,7 +121,8 @@ class EmbyApi:
         try:
             return self._request("POST", path, data=data)
         except Exception as e:
-            logger.error(f"Failed to create user with name {name}: {e}", exc_info=True)
+            logger.error(f"Failed to create user with name {name}: {e}",
+                         exc_info=True)
             raise
 
     def ban_user(self, emby_id: str):
@@ -147,7 +160,8 @@ class EmbyApi:
             return self.update_user_policy(emby_id, data)
         except Exception as e:
             logger.error(
-                f"Failed to ban user with Emby ID {emby_id}: {e}", exc_info=True
+                f"Failed to ban user with Emby ID {emby_id}: {e}",
+                exc_info=True
             )
             raise
 
@@ -186,7 +200,8 @@ class EmbyApi:
             return self.update_user_policy(emby_id, data)
         except Exception as e:
             logger.error(
-                f"Failed to set default policy for user with Emby ID {emby_id}: {e}",
+                f"Failed to set default policy for user with Emby ID "
+                f"{emby_id}: {e}",
                 exc_info=True,
             )
             raise
@@ -200,7 +215,8 @@ class EmbyApi:
         """
         path = f"/emby/Users/{emby_id}/Policy"
         logger.info(
-            f"Updating user policy for Emby ID: {emby_id} with data: {policy_data}"
+            f"Updating user policy for Emby ID: "
+            f"{emby_id} with data: {policy_data}"
         )
         try:
             return self._request("POST", path, data=policy_data)
@@ -224,7 +240,8 @@ class EmbyApi:
             return self._request("POST", path, data=data)
         except Exception as e:
             logger.error(
-                f"Failed to reset password for user with Emby ID {emby_id}: {e}",
+                f"Failed to reset password for user with Emby ID "
+                f"{emby_id}: {e}",
                 exc_info=True,
             )
             raise
@@ -293,7 +310,8 @@ class EmbyRouterAPI:
         self.api_key = api_key
         self.timeout = timeout
         logger.info(
-            f"EmbyRouterAPI initialized with URL: {self.api_url}, timeout: {self.timeout}"
+            f"EmbyRouterAPI initialized with URL: {self.api_url}"
+            f", timeout: {self.timeout}"
         )
 
     def call_api(self, path: str):
@@ -303,7 +321,8 @@ class EmbyRouterAPI:
         :return: 成功时返回 JSON，失败抛出异常
         """
         url = f"{self.api_url}{path}"
-        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+        headers = {
+            "Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         logger.debug(f"Calling API at {url}")
         try:
             response = requests.get(url, headers=headers, timeout=self.timeout)
@@ -313,11 +332,13 @@ class EmbyRouterAPI:
             logger.error("Request to router service timed out", exc_info=True)
             raise Exception("请求路由服务超时，请稍后重试或检查网络连接。")
         except requests.exceptions.ConnectionError as e:
-            logger.error(f"Failed to connect to router service: {e}", exc_info=True)
+            logger.error(f"Failed to connect to router service: {e}",
+                         exc_info=True)
             raise Exception(f"无法连接到路由服务: {str(e)}")
         except requests.exceptions.RequestException as e:
             logger.error(
-                f"An unknown error occurred while requesting router service: {e}",
+                f"An unknown error occurred while requesting router service: "
+                f"{e}",
                 exc_info=True,
             )
             raise Exception(f"请求路由服务时发生错误: {str(e)}")
@@ -342,7 +363,8 @@ class EmbyRouterAPI:
             return self.call_api(f"/api/route/{user_id}")
         except Exception as e:
             logger.error(
-                f"Failed to query user route for user ID {user_id}: {e}", exc_info=True
+                f"Failed to query user route for user ID {user_id}: {e}",
+                exc_info=True
             )
             raise
 
@@ -350,12 +372,15 @@ class EmbyRouterAPI:
         """
         更新用户当前所使用的线路。
         """
-        logger.info(f"Updating user route for user ID: {user_id} to index: {new_index}")
+        logger.info(
+            f"Updating user route for user ID: "
+            f"{user_id} to index: {new_index}")
         try:
             return self.call_api(f"/api/route/{user_id}/{new_index}")
         except Exception as e:
             logger.error(
-                f"Failed to update user route for user ID {user_id} to index {new_index}: {e}",
+                f"Failed to update user route for user ID "
+                f"{user_id} to index {new_index}: {e}",
                 exc_info=True,
             )
             raise
