@@ -1,15 +1,10 @@
-import logging
 import functools
+import logging
 from datetime import datetime
+from typing import Union
 
-from pyrogram import filters
-from pyrogram.enums import ParseMode
-from pyrogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    CallbackQuery,
-    Message,
-)
+from telethon import events, Button
+from telethon.tl.types import MessageActionChatAddUser, MessageActionChatDeleteUser
 
 from bot.bot_client import BotClient
 from bot.filters import (
@@ -36,14 +31,14 @@ class CommandHandler:
     # =============== 辅助方法 ===============
 
     @staticmethod
-    async def _reply_html(message: Message, text: str, **kwargs):
+    async def _reply_html(message, text: str, **kwargs):
         """
         统一回复方法，使用 HTML parse_mode。
         """
-        return await message.reply(text, parse_mode=ParseMode.HTML, **kwargs)
+        return await message.reply(text, parse_mode="HTML", **kwargs)
 
     @staticmethod
-    def _parse_args(message: Message) -> list[str]:
+    def _parse_args(message: events.NewMessage.Event) -> list[str]:
         """
         将用户输入拆分为命令 + 参数列表，如：
         '/create testuser' -> ['testuser']
@@ -75,7 +70,10 @@ class CommandHandler:
         return decorator
 
     async def _send_error(
-        self, message: Message, error: Exception, prefix: str = "操作失败"
+        self,
+        message: events.NewMessage.Event,
+        error: Exception,
+        prefix: str = "操作失败",
     ):
         """
         统一的异常捕获后回复方式。
@@ -86,7 +84,7 @@ class CommandHandler:
     # =============== 各类命令逻辑 ===============
 
     @ensure_args(1, "/create <用户名>")
-    async def create_user(self, message: Message, args: list[str]):
+    async def create_user(self, message: events.NewMessage.Event, args: list[str]):
         """
         /create <用户名>
         """
@@ -95,7 +93,7 @@ class CommandHandler:
         try:
             default_password = self.user_service.gen_default_passwd()
             user = await self.user_service.emby_create_user(
-                message.from_user.id, emby_name, default_password
+                message.sender_id, emby_name, default_password
             )
             if user and user.has_emby_account():
                 await self._reply_html(
@@ -107,7 +105,7 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="创建用户失败")
 
-    async def info(self, message: Message):
+    async def info(self, message: events.NewMessage.Event):
         """
         /info
         如果是私聊，查看自己信息；如果群里回复某人，则查看对方信息
@@ -150,13 +148,13 @@ class CommandHandler:
             await self._send_error(message, e, prefix="查询失败")
 
     @ensure_args(1, "/use_code <邀请码>")
-    async def use_code(self, message: Message, args: list[str]):
+    async def use_code(self, message: events.NewMessage.Event, args: list[str]):
         """
         /use_code <邀请码>
         """
 
         code = args[0]
-        telegram_id = message.from_user.id
+        telegram_id = message.sender_id
         try:
             used_code = await self.user_service.redeem_code(telegram_id, code)
             if not used_code:
@@ -179,14 +177,14 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="邀请码使用失败")
 
-    async def reset_emby_password(self, message: Message):
+    async def reset_emby_password(self, message: events.NewMessage.Event):
         """
         /reset_emby_password
         """
         default_password = self.user_service.gen_default_passwd()
         try:
             if await self.user_service.reset_password(
-                message.from_user.id, default_password
+                message.sender_id, default_password
             ):
                 await self._reply_html(
                     message,
@@ -197,7 +195,7 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="密码重置失败")
 
-    async def new_code(self, message: Message):
+    async def new_code(self, message: events.NewMessage.Event):
         """
         /new_code [数量]
         """
@@ -214,29 +212,33 @@ class CommandHandler:
         num = min(num, 20)
         try:
             code_list = await self.user_service.create_invite_code(
-                message.from_user.id, num
+                message.sender_id, num
             )
             for code_obj in code_list:
                 message_text = f"📌 邀请码：\n点击复制👉<code>{code_obj.code}</code>"
-                if message.reply_to_message is not None:
-                    await self.bot_client.client.send_message(
-                        chat_id=message.from_user.id,
-                        text=message_text,
-                        parse_mode=ParseMode.HTML,
-                    )
-                    await self.bot_client.client.send_message(
-                        chat_id=message.reply_to_message.from_user.id,
-                        text=message_text,
-                        parse_mode=ParseMode.HTML,
-                    )
-                    await self._reply_html(message, "✅ 已发送邀请码")
-                else:
-                    msg = await self._reply_html(message, message_text)
-                    self.code_to_message_id[code_obj.code] = (message.chat.id, msg.id)
+                await self.reply_user_after_create_code(code_obj, message, message_text)
         except Exception as e:
             await self._send_error(message, e, prefix="创建邀请码失败")
 
-    async def new_whitelist_code(self, message: Message):
+    async def reply_user_after_create_code(self, code_obj, message, message_text):
+        if message.message.is_reply:
+            reply_message = await message.message.get_reply_message()
+            await self.bot_client.client.send_message(
+                chat_id=message.sender_id, text=message_text, parse_mode="HTML"
+            )
+            await self.bot_client.client.send_message(
+                chat_id=reply_message.sender_id,
+                text=message_text,
+                parse_mode="HTML",
+            )
+            await self._reply_html(message, "✅ 已发送邀请码")
+        else:
+            # 如果不是回复消息，直接回复给当前发件人
+            msg = await self._reply_html(message, message_text)
+            # 保存发件人 ID 和消息 ID
+            self.code_to_message_id[code_obj.code] = (message.sender_id, msg.id)
+
+    async def new_whitelist_code(self, message: events.NewMessage.Event):
         """
         /new_whitelist_code [数量]
         """
@@ -253,38 +255,24 @@ class CommandHandler:
         num = min(num, 20)
         try:
             code_list = await self.user_service.create_whitelist_code(
-                message.from_user.id, num
+                message.sender_id, num
             )
             for code_obj in code_list:
                 message_text = (
                     f"📌 白名单邀请码：\n点击复制👉<code>{code_obj.code}</code>"
                 )
-                if message.reply_to_message is not None:
-                    await self.bot_client.client.send_message(
-                        chat_id=message.from_user.id,
-                        text=message_text,
-                        parse_mode=ParseMode.HTML,
-                    )
-                    await self.bot_client.client.send_message(
-                        chat_id=message.reply_to_message.from_user.id,
-                        text=message_text,
-                        parse_mode=ParseMode.HTML,
-                    )
-                    await self._reply_html(message, "✅ 已发送邀请码")
-                else:
-                    msg = await self._reply_html(message, message_text)
-                    self.code_to_message_id[code_obj.code] = (message.chat.id, msg.id)
+                await self.reply_user_after_create_code(code_obj, message, message_text)
         except Exception as e:
             await self._send_error(message, e, prefix="创建白名单邀请码失败")
 
-    async def ban_emby(self, message: Message):
+    async def ban_emby(self, message: events.NewMessage.Event):
         """
         /ban_emby [原因] (群里需回复某人或手动指定)
         """
         args = self._parse_args(message)
         reason = args[0] if args else "管理员禁用"
 
-        operator_id = message.from_user.id
+        operator_id = message.sender_id
         telegram_id = await get_user_telegram_id(self.bot_client.client, message)
         try:
             if await self.user_service.emby_ban(telegram_id, reason, operator_id):
@@ -296,11 +284,11 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="禁用失败")
 
-    async def unban_emby(self, message: Message):
+    async def unban_emby(self, message: events.NewMessage.Event):
         """
         /unban_emby (群里需回复某人或手动指定)
         """
-        operator_id = message.from_user.id
+        operator_id = message.sender_id
         telegram_id = await get_user_telegram_id(self.bot_client.client, message)
         try:
             if await self.user_service.emby_unban(telegram_id, operator_id):
@@ -312,13 +300,13 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="解禁失败")
 
-    async def select_line(self, message: Message):
+    async def select_line(self, message: events.NewMessage.Event):
         """
         /select_line
         用户选择线路（将返回可选线路按钮）。
         """
         try:
-            telegram_id = message.from_user.id
+            telegram_id = message.sender_id
             router_list = config.router_list or await self.user_service.get_router_list(
                 telegram_id
             )
@@ -339,39 +327,33 @@ class CommandHandler:
                     f"🔵 {name}" if index == user_router_index else f"⚪ {name}"
                 )
                 message_buttons.append(
-                    [
-                        InlineKeyboardButton(
-                            button_text, callback_data=f"SELECTROUTE_{index}"
-                        )
-                    ]
+                    [Button.inline(button_text, f"SELECTROUTE_{index}")]
                 )
-
-            keyboard = InlineKeyboardMarkup(message_buttons)
-            await self._reply_html(message, message_text, reply_markup=keyboard)
+            await self._reply_html(message, message_text, buttons=message_buttons)
         except Exception as e:
             await self._send_error(message, e, prefix="查询失败")
 
-    async def group_member_change_handler(self, clent, message: Message):
+    async def group_member_change_handler(
+        self, message: Union[MessageActionChatAddUser, MessageActionChatDeleteUser]
+    ):
         """
         群组成员变动处理器。
         """
-        if message.left_chat_member:
-            left_member_id = message.left_chat_member.id
+        if message.user_id:
+            left_member_id = message.user_id
             left_member = await self.user_service.must_get_user(left_member_id)
             if (
                 left_member.has_emby_account()
                 and not left_member.is_emby_baned()
                 and not left_member.is_whitelist
             ):
-                await self.user_service.emby_ban(
-                    message.left_chat_member.id, "用户已退出群组"
-                )
-            config.group_members.pop(message.left_chat_member.id, None)
-        if message.new_chat_members:
-            for new_member in message.new_chat_members:
+                await self.user_service.emby_ban(message.user_id, "用户已退出群组")
+            config.group_members.pop(message.user_id, None)
+        if message.users:
+            for new_member in message.users:
                 config.group_members[new_member.id] = new_member
 
-    async def handle_callback_query(self, client, callback_query: CallbackQuery):
+    async def handle_callback_query(self, callback_query: events.CallbackQuery.Event):
         """
         回调按钮事件统一处理，如切换线路。
         """
@@ -391,18 +373,18 @@ class CommandHandler:
                     return
 
                 await self.user_service.update_user_router(
-                    callback_query.from_user.id, index
+                    callback_query.sender_id, index
                 )
                 await callback_query.answer("线路已更新")
-                await callback_query.message.edit(
+                await callback_query.edit(
                     f"已选择 <b>{selected_router['name']}</b>\n"
                     "生效可能会有 30 秒延迟，请耐心等候。"
                 )
             except Exception as e:
-                await callback_query.answer(f"操作失败：{str(e)}", show_alert=True)
+                await callback_query.answer(f"操作失败：{str(e)}", alert=True)
                 logger.error(f"Callback query failed: {e}", exc_info=True)
 
-    async def count(self, message: Message):
+    async def count(self, message: events.NewMessage.Event):
         """
         /count
         查询服务器内片子数量
@@ -424,7 +406,7 @@ class CommandHandler:
             await self._send_error(message, e, prefix="查询失败")
 
     @ensure_args(2, "/register_until 2023-10-01 12:00:00")
-    async def register_until(self, message: Message, args: list[str]):
+    async def register_until(self, message: events.NewMessage.Event, args: list[str]):
         """
         /register_until <时间: YYYY-MM-DD HH:MM:SS>
         限时开放注册
@@ -438,7 +420,7 @@ class CommandHandler:
                 return await self._reply_html(message, "❌ 时间必须晚于当前时间")
 
             await self.user_service.set_emby_config(
-                message.from_user.id, register_public_time=int(time.timestamp())
+                message.sender_id, register_public_time=int(time.timestamp())
             )
             await self._reply_html(
                 message, f"✅ 已开放注册，截止时间：<code>{time_str}</code>"
@@ -447,7 +429,7 @@ class CommandHandler:
             await self._send_error(message, e, prefix="开放注册失败")
 
     @ensure_args(1, "/register_amount <人数>")
-    async def register_amount(self, message: Message, args: list[str]):
+    async def register_amount(self, message: events.NewMessage.Event, args: list[str]):
         """
         /register_amount <人数>
         开放指定数量的注册名额
@@ -456,7 +438,7 @@ class CommandHandler:
         try:
             amount = int(args[0])
             await self.user_service.set_emby_config(
-                message.from_user.id, register_public_user=amount
+                message.sender_id, register_public_user=amount
             )
             await self._reply_html(
                 message, f"✅ 已开放注册，名额：<code>{amount}</code>"
@@ -464,7 +446,7 @@ class CommandHandler:
         except Exception as e:
             await self._send_error(message, e, prefix="开放注册失败")
 
-    async def help_command(self, message: Message):
+    async def help_command(self, message):
         """
         /help 或 /start
         查看命令帮助。
@@ -479,7 +461,7 @@ class CommandHandler:
             "/count - 查看服务器内影片数量\n"
             "/help - 显示本帮助\n"
         )
-        if await self.user_service.is_admin(message.from_user.id):
+        if await self.user_service.is_admin(message.sender_id):
             help_message += (
                 "\n<b>管理命令：</b>\n"
                 "/new_code [数量] - 创建新的普通邀请码\n"
@@ -494,96 +476,101 @@ class CommandHandler:
 
     # =============== 命令挂载 ===============
     def setup_commands(self):
-        @self.bot_client.client.on_message(
-            filters.private & filters.command(["help", "start"])
-        )
-        async def c_help(client, message):
+        @self.bot_client.client.on(events.NewMessage(pattern="/start"))
+        @self.bot_client.client.on(events.NewMessage(pattern="/help"))
+        async def c_help(message):
             await self.help_command(message)
 
-        @self.bot_client.client.on_message(
-            filters.command("count") & user_in_group_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/count", func=user_in_group_on_filter)
         )
-        async def c_count(client, message):
+        async def c_count(message):
             await self.count(message)
 
-        @self.bot_client.client.on_message(
-            filters.command("info") & user_in_group_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/info", func=user_in_group_on_filter)
         )
-        async def c_info(client, message):
+        async def c_info(message):
             await self.info(message)
 
-        @self.bot_client.client.on_message(
-            filters.private & filters.command("use_code") & user_in_group_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/use_code", func=user_in_group_on_filter)
         )
-        async def c_use_code(client, message):
+        async def c_use_code(message):
             await self.use_code(message)
 
-        @self.bot_client.client.on_message(
-            filters.private & filters.command("create") & user_in_group_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/create", func=user_in_group_on_filter)
         )
-        async def c_create_user(client, message):
+        async def c_create_user(message):
             await self.create_user(message)
 
-        @self.bot_client.client.on_message(
-            filters.private
-            & filters.command("reset_emby_password")
-            & user_in_group_on_filter
-            & emby_user_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(
+                pattern="/reset_emby_password",
+                func=lambda message: message.is_private
+                and user_in_group_on_filter(message)
+                and emby_user_on_filter(message),
+            )
         )
-        async def c_reset_emby_password(client, message):
+        async def c_reset_emby_password(message):
             await self.reset_emby_password(message)
 
-        @self.bot_client.client.on_message(
-            filters.private
-            & filters.command("select_line")
-            & user_in_group_on_filter
-            & emby_user_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(
+                pattern="/select_line",
+                func=lambda message: message.is_private
+                and user_in_group_on_filter(message)
+                and emby_user_on_filter(message),
+            )
         )
-        async def c_select_line(client, message):
+        async def c_select_line(message):
             await self.select_line(message)
 
-        @self.bot_client.client.on_message(
-            filters.command("new_code") & admin_user_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/new_code", func=admin_user_on_filter)
         )
-        async def c_new_code(client, message):
+        async def c_new_code(message):
             await self.new_code(message)
 
-        @self.bot_client.client.on_message(
-            filters.command("new_whitelist_code") & admin_user_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/new_whitelist_code", func=admin_user_on_filter)
         )
-        async def c_new_whitelist_code(client, message):
+        async def c_new_whitelist_code(message):
             await self.new_whitelist_code(message)
 
-        @self.bot_client.client.on_message(
-            filters.command("ban_emby") & admin_user_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/ban_emby", func=admin_user_on_filter)
         )
-        async def c_ban_emby(client, message):
+        async def c_ban_emby(message):
             await self.ban_emby(message)
 
-        @self.bot_client.client.on_message(
-            filters.command("unban_emby") & admin_user_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/unban_emby", func=admin_user_on_filter)
         )
-        async def c_unban_emby(client, message):
+        async def c_unban_emby(message):
             await self.unban_emby(message)
 
-        @self.bot_client.client.on_message(
-            filters.command("register_until") & admin_user_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/register_until", func=admin_user_on_filter)
         )
-        async def c_register_until(client, message):
+        async def c_register_until(message):
             await self.register_until(message)
 
-        @self.bot_client.client.on_message(
-            filters.command("register_amount") & admin_user_on_filter
+        @self.bot_client.client.on(
+            events.NewMessage(pattern="/register_amount", func=admin_user_on_filter)
         )
-        async def c_register_amount(client, message):
+        async def c_register_amount(message):
             await self.register_amount(message)
 
-        @self.bot_client.client.on_callback_query()
-        async def c_select_line_cb(client, callback_query):
-            await self.handle_callback_query(client, callback_query)
+        @self.bot_client.client.on(events.callbackquery)
+        async def c_select_line_cb(callback_query: events.CallbackQuery.Event):
+            await self.handle_callback_query(callback_query)
 
-        @self.bot_client.client.on_message(
-            filters.left_chat_member | filters.new_chat_members
+        @self.bot_client.client.on(
+            events.ChatAction(
+                func=lambda message: message.user_joined or message.user_left
+            )
         )
-        async def group_member_change_handler(client, message):
-            await self.group_member_change_handler(client, message)
+        async def group_member_change_handler(message):
+            await self.group_member_change_handler(message)

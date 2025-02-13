@@ -88,7 +88,6 @@ async def setup_bot() -> BotClient:
     bot_client = BotClient(
         api_id=config.api_id,
         api_hash=config.api_hash,
-        bot_token=config.bot_token,
         name="emby_bot",
     )
     await bot_client.start()
@@ -135,7 +134,7 @@ async def main() -> None:
         # 设置命令并进入空闲状态
         command_handler.setup_commands()
         logger.info("命令处理器设置完成，Bot 进入运行状态。")
-        await bot_client.idle()
+        await bot_client.client.run_until_disconnected()
 
     except Exception as e:
         logger.error(f"启动 Bot 失败: {e}", exc_info=True)
