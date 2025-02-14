@@ -272,7 +272,9 @@ class CommandHandler:
                 message.from_user.id, num
             )
             for code_obj in code_list:
-                message_text = f"📌 白名单邀请码：\n点击复制👉<code>{code_obj.code}</code>"
+                message_text = (
+                    f"📌 白名单邀请码：\n点击复制👉<code>{code_obj.code}</code>"
+                )
                 if message.reply_to_message is not None:
                     await self.bot_client.client.send_message(
                         chat_id=message.from_user.id,
