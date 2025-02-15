@@ -16,7 +16,7 @@
 <img src="https://img.shields.io/badge/code%20style-PEP%208-000000.svg?logo=python&logoColor=blue" alt="PEP 8">
 </a>
 <br />
-<a bref="https://github.com/astral-sh/ruff">
+<a href="https://github.com/astral-sh/ruff">
 <img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v2.json" alt="ruff">
 </a>
 <a href="https://github.com/astral-sh/uv">
