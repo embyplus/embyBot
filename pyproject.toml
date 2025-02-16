@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10, <3.13"
 dependencies = [
     "asyncmy>=0.2.10",
+    "cryptg>=0.5.0.post0",
     "cryptography>=44.0.0",
     "huidevkit[db-orm]~=0.6.0",
     "pymysql==1.1.1",
