@@ -14,9 +14,7 @@ class BotClient:
         api_hash: str,
         name="emby_bot",
     ):
-        self.client = TelegramClient(
-            name, api_id=api_id, api_hash=api_hash, proxy=("socks5", "127.0.0.1", 10804)
-        )
+        self.client = TelegramClient(name, api_id=api_id, api_hash=api_hash)
         logger.info(f"Bot client initialized with name: {name}")
 
     async def get_group_members(self, group_ids: list[int]):
