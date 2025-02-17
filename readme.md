@@ -16,13 +16,14 @@
 - 限时或限量开放注册。
 
 ### 安装及运行
+本项目用[uv](https://github.com/astral-sh/uv)管理及运行
 ```bash
 git clone https://github.com/embyplus/embyBot
 cp .env.example .env
 vim .env
 
-python3 -m pip install -r requirements.txt
-python3 app.py
+uv sync
+uv run app.py
 ```
 
 ### 配置环境变量
