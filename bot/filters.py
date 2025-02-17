@@ -53,3 +53,17 @@ async def emby_user_on_filter(update: events.NewMessage.Event) -> bool:
 
     logger.debug(f"User {telegram_id} is not an Emby user")
     return False
+
+
+async def is_private_and_group_emby_message(message):
+    """
+    检查消息是否符合以下条件：
+    1. 是私有消息
+    2. 用户在指定的群组内
+    3. 用户是 Emby 用户
+    """
+    return (
+        message.is_private
+        and await user_in_group_on_filter(message)
+        and await emby_user_on_filter(message)
+    )

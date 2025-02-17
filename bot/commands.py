@@ -10,7 +10,7 @@ from bot.bot_client import BotClient
 from bot.filters import (
     user_in_group_on_filter,
     admin_user_on_filter,
-    emby_user_on_filter,
+    is_private_and_group_emby_message,
 )
 from bot.message_helper import get_user_telegram_id
 from bot.utils import parse_iso8601_to_normal_date
@@ -508,9 +508,7 @@ class CommandHandler:
         @self.bot_client.client.on(
             events.NewMessage(
                 pattern="/reset_emby_password",
-                func=lambda message: message.is_private
-                and user_in_group_on_filter(message)
-                and emby_user_on_filter(message),
+                func=is_private_and_group_emby_message,
             )
         )
         async def c_reset_emby_password(message):
@@ -519,9 +517,7 @@ class CommandHandler:
         @self.bot_client.client.on(
             events.NewMessage(
                 pattern="/select_line",
-                func=lambda message: message.is_private
-                and user_in_group_on_filter(message)
-                and emby_user_on_filter(message),
+                func=is_private_and_group_emby_message,
             )
         )
         async def c_select_line(message):
