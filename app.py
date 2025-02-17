@@ -52,11 +52,16 @@ async def _init_db() -> None:
 def _init_logger() -> None:
     """初始化日志记录器。"""
     handler = logging.StreamHandler()  # 输出到终端
+    fmt = "%(levelname)s [%(asctime)s] %(name)s - %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
     formatter = logging.Formatter(
-        fmt="%(levelname)s [%(asctime)s] %(name)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+        fmt=fmt,
+        datefmt=datefmt,
     )
     handler.setFormatter(formatter)
+
+    # 设置日志默认值
+    logging.basicConfig(format=fmt, datefmt=datefmt, level=config.log_level)
 
     # 添加流处理器
     logger.addHandler(handler)
