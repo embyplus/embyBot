@@ -357,7 +357,7 @@ class CommandHandler:
         """
         回调按钮事件统一处理，如切换线路。
         """
-        data = callback_query.data.split("_")
+        data = callback_query.data.decode().split("_")
         if data[0] == "SELECTROUTE":
             index = data[1]
             try:
@@ -378,7 +378,8 @@ class CommandHandler:
                 await callback_query.answer("线路已更新")
                 await callback_query.edit(
                     f"已选择 <b>{selected_router['name']}</b>\n"
-                    "生效可能会有 30 秒延迟，请耐心等候。"
+                    "生效可能会有 30 秒延迟，请耐心等候。",
+                    parse_mode="HTML",
                 )
             except Exception as e:
                 await callback_query.answer(f"操作失败：{str(e)}", alert=True)
@@ -559,7 +560,7 @@ class CommandHandler:
         async def c_register_amount(message):
             await self.register_amount(message)
 
-        @self.bot_client.client.on(events.callbackquery)
+        @self.bot_client.client.on(events.CallbackQuery)
         async def c_select_line_cb(callback_query: events.CallbackQuery.Event):
             await self.handle_callback_query(callback_query)
 
