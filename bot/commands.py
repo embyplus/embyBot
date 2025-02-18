@@ -348,7 +348,7 @@ class CommandHandler:
         """
         群组成员变动处理器。
         """
-        if message.user_id:
+        if message.user_left or message.user_kicked:
             left_member_id = message.user_id
             left_member = await self.user_service.must_get_user(left_member_id)
             if (
@@ -358,7 +358,7 @@ class CommandHandler:
             ):
                 await self.user_service.emby_ban(message.user_id, "用户已退出群组")
             config.group_members.pop(message.user_id, None)
-        if message.users:
+        if message.user_joined or message.user_added:
             for new_member in message.users:
                 config.group_members[new_member.id] = new_member
 
