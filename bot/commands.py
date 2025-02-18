@@ -4,7 +4,11 @@ from datetime import datetime
 from typing import Union
 
 from telethon import events, Button
-from telethon.tl.types import MessageActionChatAddUser, MessageActionChatDeleteUser
+from telethon.tl.types import (
+    MessageActionChatAddUser,
+    MessageActionChatDeleteUser,
+    MessageActionChatJoinedByLink,
+)
 
 from bot.bot_client import BotClient
 from bot.filters import (
@@ -334,7 +338,12 @@ class CommandHandler:
             await self._send_error(message, e, prefix="查询失败")
 
     async def group_member_change_handler(
-        self, message: Union[MessageActionChatAddUser, MessageActionChatDeleteUser]
+            self,
+            message: Union[
+                MessageActionChatAddUser,
+                MessageActionChatDeleteUser,
+                MessageActionChatJoinedByLink,
+            ],
     ):
         """
         群组成员变动处理器。
@@ -566,7 +575,10 @@ class CommandHandler:
 
         @self.bot_client.client.on(
             events.ChatAction(
-                func=lambda message: message.user_joined or message.user_left
+                func=lambda message: message.user_joined
+                or message.user_added
+                or message.user_left
+                or message.user_kicked
             )
         )
         async def group_member_change_handler(message):
