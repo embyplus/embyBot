@@ -10,7 +10,6 @@ dependencies = [
     "cryptography>=44.0.0",
     "huidevkit[db-orm]~=0.6.0",
     "pymysql==1.1.1",
-    "pyrogram",
     "python-dotenv==1.0.1",
     "pytz~=2025.1",
     "requests==2.31.0",
@@ -20,6 +19,3 @@ dependencies = [
     "tgcrypto==1.2.5",
     "urllib3==2.3.0",
 ]
-
-[tool.uv.sources]
-pyrogram = { git = "https://github.com/rebeeh/pyrogram.git", rev = "master" }
