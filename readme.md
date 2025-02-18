@@ -1,5 +1,7 @@
 ## Emby Bot 项目
-本项目是一个基于 Pyrogram 的 Telegram Bot，用于管理 Emby 用户、发送邀请码、查询 Emby 资源等操作。同时集成了针对 Emby 路由服务的切换功能。项目主要通过 Python + SQLAlchemy + Pyrogram 实现。
+
+本项目是一个基于 Telethon 的 Telegram Bot，用于管理 Emby 用户、发送邀请码、查询 Emby 资源等操作。同时集成了针对 Emby
+路由服务的切换功能。项目主要通过 Python + SQLAlchemy + Telethon 实现。
 
 ### 功能概述
 #### 用户管理：
@@ -75,6 +77,7 @@ python3 app.py
 
 
 ### Thanks
-- [Pyrogram](https://docs.pyrogram.org/) - Telegram API for Python
+
+- [Telethon](https://docs.telethon.dev/) - Telegram API for Python
 - [SQLAlchemy](https://www.sqlalchemy.org/) - Python SQL Toolkit and Object-Relational Mapping
 - [Emby服管理bot by小草](https://github.com/xiaocao666tzh/EmbyBot)
