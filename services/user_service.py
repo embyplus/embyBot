@@ -17,6 +17,9 @@ from models.user_model import UserOrm
 
 logger = logging.getLogger(__name__)
 
+class NotBoundError(Exception):
+    """用户未绑定 Emby 账号的异常"""
+    pass
 
 class UserService:
     """用户与 Emby 相关的业务逻辑层"""
@@ -134,12 +137,10 @@ class UserService:
         """获取当前用户在 Emby 的信息"""
         user = await self.must_get_user(telegram_id)
         if not user.has_emby_account():
-            raise Exception("该用户尚未绑定 Emby 账号。")
+            raise NotBoundError("该用户尚未绑定 Emby 账号。")
         emby_user = self.emby_api.get_user(str(user.emby_id))
         if not emby_user:
-            raise Exception(
-                "从 Emby 服务器获取用户信息失败，请检查 Emby 服务是否正常。"
-            )
+            raise Exception("从 Emby 服务器获取用户信息失败，请检查 Emby 服务是否正常。")
         return user, emby_user
 
     async def first_or_create_emby_config(self) -> Config:
