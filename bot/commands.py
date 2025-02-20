@@ -22,6 +22,7 @@ from bot.utils import parse_iso8601_to_normal_date
 from config import config
 from models.invite_code_model import InviteCodeType
 from services import UserService
+from services.user_service import NotBoundError
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +147,12 @@ class CommandHandler:
                     reply_text += f"• 被ban原因：<code>{user.reason}</code>\n"
 
             await self._reply_html(message, reply_text)
+        except NotBoundError as e:
+            await self._reply_html(message, f"查询失败：{str(e)}")
+            return
         except Exception as e:
             await self._send_error(message, e, prefix="查询失败")
+            return
 
     @ensure_args(1, "/use_code <邀请码>")
     async def use_code(self, message: Message, args: list[str]):
@@ -501,25 +506,25 @@ class CommandHandler:
             await self.help_command(message)
 
         @self.bot_client.client.on_message(
-            filters.command("count") & user_in_group_on_filter
+            filters.command("count") & user_in_group_on_filter()
         )
         async def c_count(client, message):
             await self.count(message)
 
         @self.bot_client.client.on_message(
-            filters.command("info") & user_in_group_on_filter
+            filters.command("info") & user_in_group_on_filter()
         )
         async def c_info(client, message):
             await self.info(message)
 
         @self.bot_client.client.on_message(
-            filters.private & filters.command("use_code") & user_in_group_on_filter
+            filters.private & filters.command("use_code") & user_in_group_on_filter()
         )
         async def c_use_code(client, message):
             await self.use_code(message)
 
         @self.bot_client.client.on_message(
-            filters.private & filters.command("create") & user_in_group_on_filter
+            filters.private & filters.command("create") & user_in_group_on_filter()
         )
         async def c_create_user(client, message):
             await self.create_user(message)
@@ -527,7 +532,7 @@ class CommandHandler:
         @self.bot_client.client.on_message(
             filters.private
             & filters.command("reset_emby_password")
-            & user_in_group_on_filter
+            & user_in_group_on_filter()
             & emby_user_on_filter
         )
         async def c_reset_emby_password(client, message):
@@ -536,7 +541,7 @@ class CommandHandler:
         @self.bot_client.client.on_message(
             filters.private
             & filters.command("select_line")
-            & user_in_group_on_filter
+            & user_in_group_on_filter()
             & emby_user_on_filter
         )
         async def c_select_line(client, message):
