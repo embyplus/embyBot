@@ -1,5 +1,6 @@
 import logging
-import requests
+import aiohttp
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class EmbyApi:
             f"EmbyApi initialized with URL: {self.base_url}, timeout: {self.timeout}"
         )
 
-    def _request(self, method: str, path: str, data=None, params=None):
+    async def _request(self, method: str, path: str, data=None, params=None):
         """
         内部通用请求方法，用于简化 GET / POST 等请求的异常处理、状态码检查等。
 
@@ -46,42 +47,28 @@ class EmbyApi:
         logger.debug(
             f"Making {method} request to {url} with params: {params}, data: {data}"
         )
-        try:
-            if method.upper() == "GET":
-                response = requests.get(
-                    url, params=params, timeout=self.timeout, headers=headers
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=self.timeout)
+        ) as session:
+            try:
+                async with session.request(
+                    method, url, params=params, json=data, headers=headers
+                ) as response:
+                    if response.status != 200:
+                        raise Exception(
+                            f"Request failed with status code {response.status}"
+                        )
+                    return await response.json()
+            except aiohttp.ClientError as e:
+                logger.error(
+                    f"An error occurred while requesting Emby: {e}", exc_info=True
                 )
-            elif method.upper() == "POST":
-                response = requests.post(
-                    url, params=params, json=data, timeout=self.timeout, headers=headers
-                )
-            else:
-                raise Exception(f"暂不支持的 HTTP 方法: {method}")
+                raise Exception(f"请求 Emby 时发生错误: {str(e)}")
+            except asyncio.TimeoutError:
+                logger.error("Request to Emby server timed out", exc_info=True)
+                raise Exception("请求 Emby 服务器超时，请稍后重试或检查网络连接。")
 
-        except requests.exceptions.Timeout:
-            # 超时异常，抛出中文提示
-            logger.error("Request to Emby server timed out", exc_info=True)
-            raise Exception("请求 Emby 服务器超时，请稍后重试或检查网络连接。")
-        except requests.exceptions.ConnectionError as e:
-            # 连接异常
-            logger.error(f"Failed to connect to Emby server: {e}", exc_info=True)
-            raise Exception(f"无法连接到 Emby 服务器: {str(e)}")
-        except requests.exceptions.RequestException as e:
-            # 其他 requests 异常
-            logger.error(
-                f"An unknown error occurred while requesting Emby: {e}", exc_info=True
-            )
-            raise Exception(f"请求 Emby 时发生未知错误: {str(e)}")
-
-        try:
-            response.raise_for_status()
-            logger.debug(f"Request successful, status code: {response.status_code}")
-        except Exception as e:
-            logger.error(f"Emby API request failed: {e}", exc_info=True)
-            raise Exception(f"Emby API 请求失败")
-        return response.json() if response.text else None
-
-    def get_user(self, emby_id: str):
+    async def get_user(self, emby_id: str):
         """
         根据用户 ID 获取 Emby 用户信息。
         :param emby_id: Emby 用户 ID
@@ -90,14 +77,14 @@ class EmbyApi:
         path = f"/emby/Users/{emby_id}"
         logger.info(f"Getting user with Emby ID: {emby_id}")
         try:
-            return self._request("GET", path)
+            return await self._request("GET", path)
         except Exception as e:
             logger.error(
                 f"Failed to get user with Emby ID {emby_id}: {e}", exc_info=True
             )
             raise
 
-    def create_user(self, name: str):
+    async def create_user(self, name: str):
         """
         在 Emby 中创建新用户。
         :param name: 用户名
@@ -107,12 +94,12 @@ class EmbyApi:
         data = {"Name": name, "HasPassword": False}
         logger.info(f"Creating user with name: {name}")
         try:
-            return self._request("POST", path, data=data)
+            return await self._request("POST", path, data=data)
         except Exception as e:
             logger.error(f"Failed to create user with name {name}: {e}", exc_info=True)
             raise
 
-    def ban_user(self, emby_id: str):
+    async def ban_user(self, emby_id: str):
         """
         禁用 Emby 用户：设置其 Policy，使其无法登录或观看。
         :param emby_id: Emby 用户 ID
@@ -144,14 +131,14 @@ class EmbyApi:
         }
         logger.info(f"Banning user with Emby ID: {emby_id}")
         try:
-            return self.update_user_policy(emby_id, data)
+            return await self.update_user_policy(emby_id, data)
         except Exception as e:
             logger.error(
                 f"Failed to ban user with Emby ID {emby_id}: {e}", exc_info=True
             )
             raise
 
-    def set_default_policy(self, emby_id: str):
+    async def set_default_policy(self, emby_id: str):
         """
         取消禁用或为新建用户设置默认权限 Policy。
         :param emby_id: Emby 用户 ID
@@ -183,7 +170,7 @@ class EmbyApi:
         }
         logger.info(f"Setting default policy for user with Emby ID: {emby_id}")
         try:
-            return self.update_user_policy(emby_id, data)
+            return await self.update_user_policy(emby_id, data)
         except Exception as e:
             logger.error(
                 f"Failed to set default policy for user with Emby ID {emby_id}: {e}",
@@ -191,7 +178,7 @@ class EmbyApi:
             )
             raise
 
-    def update_user_policy(self, emby_id: str, policy_data: dict):
+    async def update_user_policy(self, emby_id: str, policy_data: dict):
         """
         更新 Emby 用户的 policy 设置，如是否禁用、并发数等。
         :param emby_id: Emby 用户 ID
@@ -203,7 +190,7 @@ class EmbyApi:
             f"Updating user policy for Emby ID: {emby_id} with data: {policy_data}"
         )
         try:
-            return self._request("POST", path, data=policy_data)
+            return await self._request("POST", path, data=policy_data)
         except Exception as e:
             logger.error(
                 f"Failed to update user policy for Emby ID {emby_id}: {e}",
@@ -211,7 +198,7 @@ class EmbyApi:
             )
             raise
 
-    def reset_user_password(self, emby_id: str):
+    async def reset_user_password(self, emby_id: str):
         """
         重置用户密码（让 Emby 忘记当前密码，此后需要重新设置新密码）。
         :param emby_id: Emby 用户 ID
@@ -221,7 +208,7 @@ class EmbyApi:
         data = {"ResetPassword": True}
         logger.info(f"Resetting password for user with Emby ID: {emby_id}")
         try:
-            return self._request("POST", path, data=data)
+            return await self._request("POST", path, data=data)
         except Exception as e:
             logger.error(
                 f"Failed to reset password for user with Emby ID {emby_id}: {e}",
@@ -229,7 +216,7 @@ class EmbyApi:
             )
             raise
 
-    def set_user_password(self, emby_id: str, new_pass: str):
+    async def set_user_password(self, emby_id: str, new_pass: str):
         """
         设置指定 Emby 用户的新密码。
         :param emby_id: Emby 用户 ID
@@ -240,7 +227,7 @@ class EmbyApi:
         data = {"ResetPassword": False, "CurrentPw": "", "NewPw": new_pass}
         logger.info(f"Setting password for user with Emby ID: {emby_id}")
         try:
-            return self._request("POST", path, data=data)
+            return await self._request("POST", path, data=data)
         except Exception as e:
             logger.error(
                 f"Failed to set password for user with Emby ID {emby_id}: {e}",
@@ -248,7 +235,7 @@ class EmbyApi:
             )
             raise
 
-    def check_emby_site(self) -> bool:
+    async def check_emby_site(self) -> bool:
         """
         检查 Emby 是否可用，仅做简单的 200 检查。
         :return: 若状态码为 200 则返回 True，否则抛出异常或返回 False
@@ -256,15 +243,13 @@ class EmbyApi:
         path = "/emby/System/Info"
         logger.info("Checking Emby site availability")
         try:
-            self._request("GET", path)
+            await self._request("GET", path)
             return True
         except Exception as e:
             logger.warning(f"Emby site check failed: {e}", exc_info=True)
-            # 这里可以选择记录日志，或者返回 False 让上层自己判断
-            # raise 或者 return False 看业务需求
             return False
 
-    def count(self):
+    async def count(self):
         """
         获取 Emby 中影视的数量汇总。
         :return: 包含影视数量信息的 JSON
@@ -272,7 +257,7 @@ class EmbyApi:
         path = "/emby/Items/Counts"
         logger.info("Getting Emby item counts")
         try:
-            return self._request("GET", path)
+            return await self._request("GET", path)
         except Exception as e:
             logger.error(f"Failed to get Emby item counts: {e}", exc_info=True)
             raise
@@ -296,7 +281,7 @@ class EmbyRouterAPI:
             f"EmbyRouterAPI initialized with URL: {self.api_url}, timeout: {self.timeout}"
         )
 
-    def call_api(self, path: str):
+    async def call_api(self, path: str):
         """
         路由API通用请求方法。
         :param path: API路径
@@ -305,54 +290,57 @@ class EmbyRouterAPI:
         url = f"{self.api_url}{path}"
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         logger.debug(f"Calling API at {url}")
-        try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
-            response.raise_for_status()  # 如果状态码非 200-299，自动抛出异常
-            return response.json()
-        except requests.exceptions.Timeout:
-            logger.error("Request to router service timed out", exc_info=True)
-            raise Exception("请求路由服务超时，请稍后重试或检查网络连接。")
-        except requests.exceptions.ConnectionError as e:
-            logger.error(f"Failed to connect to router service: {e}", exc_info=True)
-            raise Exception(f"无法连接到路由服务: {str(e)}")
-        except requests.exceptions.RequestException as e:
-            logger.error(
-                f"An unknown error occurred while requesting router service: {e}",
-                exc_info=True,
-            )
-            raise Exception(f"请求路由服务时发生错误: {str(e)}")
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=self.timeout)
+        ) as session:
+            try:
+                async with session.get(url, headers=headers) as response:
+                    if response.status != 200:
+                        raise Exception(
+                            f"Request failed with status code {response.status}"
+                        )
+                    return await response.json()
+            except aiohttp.ClientError as e:
+                logger.error(
+                    f"An error occurred while requesting router service: {e}",
+                    exc_info=True,
+                )
+                raise Exception(f"请求路由服务时发生错误: {str(e)}")
+            except asyncio.TimeoutError:
+                logger.error("Request to router service timed out", exc_info=True)
+                raise Exception("请求路由服务超时，请稍后重试或检查网络连接。")
 
-    def query_all_route(self):
+    async def query_all_route(self):
         """
         获取所有可用线路。
         """
         logger.info("Querying all routes")
         try:
-            return self.call_api("/api/route")
+            return await self.call_api("/api/route")
         except Exception as e:
             logger.error(f"Failed to query all routes: {e}", exc_info=True)
             raise
 
-    def query_user_route(self, user_id: str):
+    async def query_user_route(self, user_id: str):
         """
         获取指定用户当前所选的线路信息。
         """
         logger.info(f"Querying user route for user ID: {user_id}")
         try:
-            return self.call_api(f"/api/route/{user_id}")
+            return await self.call_api(f"/api/route/{user_id}")
         except Exception as e:
             logger.error(
                 f"Failed to query user route for user ID {user_id}: {e}", exc_info=True
             )
             raise
 
-    def update_user_route(self, user_id: str, new_index: str):
+    async def update_user_route(self, user_id: str, new_index: str):
         """
         更新用户当前所使用的线路。
         """
         logger.info(f"Updating user route for user ID: {user_id} to index: {new_index}")
         try:
-            return self.call_api(f"/api/route/{user_id}/{new_index}")
+            return await self.call_api(f"/api/route/{user_id}/{new_index}")
         except Exception as e:
             logger.error(
                 f"Failed to update user route for user ID {user_id} to index {new_index}: {e}",
