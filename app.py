@@ -4,7 +4,6 @@ from datetime import datetime
 
 import pytz
 from py_tools.connections.db.mysql import DBManager, BaseOrmTable, SQLAlchemyManager
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from bot.bot_client import BotClient
@@ -19,15 +18,15 @@ logger = logging.getLogger(__name__)
 
 async def create_database_if_not_exists() -> None:
     """创建数据库。"""
-    engine_without_db = create_async_engine(
+    engine = create_async_engine(
         f"mysql+asyncmy://{config.db_user}:{config.db_pass}@{config.db_host}:{config.db_port}/",
         echo=True,
     )
-    async with engine_without_db.begin() as conn:
+    async with engine.begin() as conn:
         query = f"CREATE DATABASE IF NOT EXISTS {config.db_name}"
         logger.info(f"SQL Query: {query}, Context: Creating database")
-        await conn.execute(text(query))
-    await engine_without_db.dispose()
+        await conn.exec_driver_sql(query)
+    await engine.dispose()
 
 
 async def _init_db() -> None:
