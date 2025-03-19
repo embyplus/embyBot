@@ -1,9 +1,9 @@
 import logging
 import enum
-from py_tools.connections.db.mysql import DBManager
-from py_tools.connections.db.mysql.orm_model import BaseOrmTableWithTS
-from sqlalchemy import String, BigInteger, Boolean, Enum
+from sqlalchemy import String, BigInteger, Boolean, Enum, select
 from sqlalchemy.orm import Mapped, mapped_column
+
+from .database import Base, BaseModelWithTS, DbOperations, get_session
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class InviteCodeType(enum.Enum):
         return self.value
 
 
-class InviteCode(BaseOrmTableWithTS):
+class InviteCode(Base, BaseModelWithTS):
     __tablename__ = "invite_code"
 
     code: Mapped[str] = mapped_column(
@@ -40,8 +40,43 @@ class InviteCode(BaseOrmTableWithTS):
         )
 
 
-class InviteCodeOrm(DBManager):
-    orm_table = InviteCode
+class InviteCodeRepository:
+    """Replaces InviteCodeOrm to handle InviteCode database operations"""
 
+    @staticmethod
+    async def create_invite_code(**kwargs):
+        return await DbOperations.create(InviteCode, **kwargs)
 
-logger.info("InviteCode model initialized")
+    @staticmethod
+    async def get_by_id(code_id: int):
+        return await DbOperations.get_by_id(InviteCode, code_id)
+
+    @staticmethod
+    async def get_by_code(code: str):
+        async for session in get_session():
+            result = await session.execute(
+                select(InviteCode).where(InviteCode.code == code)
+            )
+            return result.scalars().first()
+
+    @staticmethod
+    async def get_by_telegram_id(telegram_id: int):
+        async for session in get_session():
+            result = await session.execute(
+                select(InviteCode).where(InviteCode.telegram_id == telegram_id)
+            )
+            return result.scalars().all()
+
+    @staticmethod
+    async def update_invite_code(code_id: int, **kwargs):
+        return await DbOperations.update(InviteCode, code_id, **kwargs)
+
+    @staticmethod
+    async def mark_as_used(code_id: int, used_time: int, used_user_id: int):
+        return await DbOperations.update(
+            InviteCode,
+            code_id,
+            is_used=True,
+            used_time=used_time,
+            used_user_id=used_user_id,
+        )

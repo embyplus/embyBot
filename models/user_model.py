@@ -1,15 +1,14 @@
 import logging
-from py_tools.connections.db.mysql import DBManager
-from py_tools.connections.db.mysql.orm_model import BaseOrmTableWithTS
-from sqlalchemy import String, Boolean, BigInteger
+from sqlalchemy import String, Boolean, BigInteger, select
 from sqlalchemy.orm import Mapped, mapped_column
 
+from .database import Base, BaseModelWithTS, DbOperations, get_session
 from config import config
 
 logger = logging.getLogger(__name__)
 
 
-class User(BaseOrmTableWithTS):
+class User(Base, BaseModelWithTS):
     __tablename__ = "user"
 
     telegram_id: Mapped[int] = mapped_column(
@@ -108,8 +107,35 @@ class User(BaseOrmTableWithTS):
         return self.ban_time, self.reason
 
 
-class UserOrm(DBManager):
-    orm_table = User
+class UserRepository:
+    """Replaces UserOrm to handle User database operations"""
 
+    @staticmethod
+    async def create_user(**kwargs):
+        return await DbOperations.create(User, **kwargs)
 
-logger.info("User model initialized")
+    @staticmethod
+    async def get_by_id(user_id: int):
+        return await DbOperations.get_by_id(User, user_id)
+
+    @staticmethod
+    async def get_by_telegram_id(telegram_id: int):
+        async for session in get_session():
+            result = await session.execute(
+                select(User).where(User.telegram_id == telegram_id)
+            )
+            return result.scalars().first()
+
+    @staticmethod
+    async def get_by_emby_id(emby_id: str):
+        async for session in get_session():
+            result = await session.execute(select(User).where(User.emby_id == emby_id))
+            return result.scalars().first()
+
+    @staticmethod
+    async def update_user(user_id: int, **kwargs):
+        return await DbOperations.update(User, user_id, **kwargs)
+
+    @staticmethod
+    async def delete_user(user_id: int):
+        return await DbOperations.delete(User, user_id)
