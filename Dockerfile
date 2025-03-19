@@ -8,7 +8,8 @@ ENV TZ=Asia/Shanghai \
     PGID=0 \
     UMASK=000 \
     PYTHONWARNINGS="ignore:semaphore_tracker:UserWarning" \
-    WORKDIR="/app"
+    WORKDIR="/app" \
+    PATH="/root/.local/bin:${PATH}"
 
 # Set working directory
 WORKDIR ${WORKDIR}
@@ -17,19 +18,28 @@ WORKDIR ${WORKDIR}
 COPY pyproject.toml uv.lock .python-version ./
 
 # Install uv and application dependencies
-RUN apk add --no-cache --virtual .build-deps gcc git musl-dev && \
+# Use bash explicitly to support 'source' command
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    git \
+    wget \
+    ca-certificates \
+    bash \
+    libc6-dev \
+    python3-dev && \
     # Log Python version from .python-version file
     echo "Target Python version from .python-version: $(cat .python-version)" && \
     # Install uv
-    wget -qO- https://astral.sh/uv/install.sh | sh && \
-    # Make sure uv is in PATH
-    source /root/.local/bin/env && \
+    wget -qO- https://astral.sh/uv/install.sh | bash && \
+    # Make uv available without source
+    bash -c 'export PATH="/root/.local/bin:$PATH" && \
     # Install project dependencies from pyproject.toml
-    uv sync && \
-    # Clean up
-    uv cache clean && \
-    apk del --purge .build-deps && \
-    rm -rf /tmp/* /root/.cache /var/cache/apk/*
+    /root/.local/bin/uv sync' && \
+    # Clean up build dependencies
+    apt-get purge -y --auto-remove gcc git wget && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
 
 # Copy the rest of the application
 COPY . .
