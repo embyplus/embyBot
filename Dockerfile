@@ -1,36 +1,52 @@
-# 用于构建和设置变量
-FROM python:3.12-alpine AS builder
+# Single-stage build for Python application
+FROM python:3.12-slim
 
-# 设置时区为Asia/Shanghai, DOCKER_MODE为1
+# Set environment variables
 ENV TZ=Asia/Shanghai \
-  DOCKER_MODE=1 \
-  PUID=0 \
-  PGID=0 \
-  UMASK=000 \
-  PYTHONWARNINGS="ignore:semaphore_tracker:UserWarning" \
-  WORKDIR="/app"
+    DOCKER_MODE=1 \
+    PUID=0 \
+    PGID=0 \
+    UMASK=000 \
+    PYTHONWARNINGS="ignore:semaphore_tracker:UserWarning" \
+    WORKDIR="/app" \
+    PATH="/root/.local/bin:${PATH}"
 
-# 设置默认工作目录
+# Set working directory
 WORKDIR ${WORKDIR}
 
-#复制uv lockfile到工作目录中
-COPY uv.lock ${WORKDIR}
+# Copy requirements files first for better caching
+COPY pyproject.toml uv.lock .python-version ./
 
-# 安装必要的环境
-RUN apk add --no-cache --virtual .build-deps gcc git musl-dev \
-  && wget -qO- https://astral.sh/uv/install.sh | sh \
-  && source /root/.local/bin/env \
-  && uv sync \
-  && uv cache clean \
-  && apk del --purge .build-deps \
-  && rm -rf /tmp/* /root/.cache /var/cache/apk/*
+# Install uv and application dependencies
+# Use bash explicitly to support 'source' command
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    git \
+    wget \
+    ca-certificates \
+    bash \
+    libc6-dev \
+    python3-dev && \
+    # Log Python version from .python-version file
+    echo "Target Python version from .python-version: $(cat .python-version)" && \
+    # Install uv
+    wget -qO- https://astral.sh/uv/install.sh | bash && \
+    # Make uv available without source
+    bash -c 'export PATH="/root/.local/bin:$PATH" && \
+    # Install project dependencies from pyproject.toml
+    /root/.local/bin/uv sync' && \
+    # Clean up build dependencies
+    apt-get purge -y --auto-remove gcc git wget && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
 
-# 将从构建上下文目录中的文件和目录复制到新的一层的镜像内的工作目录中
+# Copy the rest of the application
 COPY . .
 
-# 将应用日志输出到stdout
+# Redirect logs to stdout
 RUN ln -sf /dev/stdout /app/default.log
 
-# 定义容器启动时执行的默认命令
-ENTRYPOINT ["/root/.local/bin/uv","run","app.py"]
+# Define entrypoint using uv
+ENTRYPOINT ["/root/.local/bin/uv", "run", "app.py"]
 

@@ -3,54 +3,54 @@ import logging
 from datetime import datetime
 
 import pytz
-from py_tools.connections.db.mysql import DBManager, BaseOrmTable, SQLAlchemyManager
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from bot.bot_client import BotClient
 from bot.commands import CommandHandler
 from config import config
 from core.emby_api import EmbyApi, EmbyRouterAPI
 from services import UserService
+from models.database import (
+    init_db,
+    create_database_if_not_exists,
+    create_tables,
+)
 
 # Initialize logger
 logger = logging.getLogger(__name__)
-
-
-async def create_database_if_not_exists() -> None:
-    """创建数据库。"""
-    engine_without_db = create_async_engine(
-        f"mysql+asyncmy://{config.db_user}:{config.db_pass}@{config.db_host}:{config.db_port}/",
-        echo=True,
-    )
-    async with engine_without_db.begin() as conn:
-        query = f"CREATE DATABASE IF NOT EXISTS {config.db_name}"
-        logger.info(f"SQL Query: {query}, Context: Creating database")
-        await conn.execute(text(query))
-    await engine_without_db.dispose()
+# <CURRENT_CURSOR_POSITION>
 
 
 async def _init_db() -> None:
     """初始化数据库连接并创建表。"""
-    await create_database_if_not_exists()
-
-    db_client = SQLAlchemyManager(
+    # Create database if it doesn't exist
+    await create_database_if_not_exists(
         host=config.db_host,
         port=config.db_port,
         user=config.db_user,
         password=config.db_pass,
         db_name=config.db_name,
     )
-    db_client.init_mysql_engine()
-    DBManager.init_db_client(db_client)
 
-    async with DBManager.connection() as conn:
-        logger.info("Context: Creating tables")
-        await conn.run_sync(BaseOrmTable.metadata.create_all)
+    # Initialize the engine and session factory
+    await init_db(
+        host=config.db_host,
+        port=config.db_port,
+        user=config.db_user,
+        password=config.db_pass,
+        db_name=config.db_name,
+        echo=True,
+    )
+
+    # Create all tables
+    await create_tables()
 
 
 def _init_logger() -> None:
     """初始化日志记录器。"""
+    # Clear any existing handlers to prevent duplicates
+    logger.handlers = []
+
+    # Create handlers
     handler = logging.StreamHandler()  # 输出到终端
     fmt = "%(levelname)s [%(asctime)s] %(name)s - %(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
@@ -60,16 +60,13 @@ def _init_logger() -> None:
     )
     handler.setFormatter(formatter)
 
-    # 设置日志默认值
-    logging.basicConfig(format=fmt, datefmt=datefmt, level=config.log_level)
-
-    # 添加流处理器
-    logger.addHandler(handler)
-
-    # 设置日志级别
+    # Set log level
     logger.setLevel(config.log_level)
 
-    # 如果你需要将日志写入文件，可以继续保持原有的文件配置：
+    # Add handler (don't use basicConfig if you're manually configuring)
+    logger.addHandler(handler)
+
+    # Add file handler if needed
     file_handler = logging.FileHandler("default.log")
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)

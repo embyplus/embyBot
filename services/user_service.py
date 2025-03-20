@@ -6,20 +6,22 @@ from random import sample
 from typing import Optional, List, Dict, Tuple
 
 import shortuuid
-from sqlalchemy import select
 
 from config import config
 from core.emby_api import EmbyApi, EmbyRouterAPI
-from models import User, Config, InviteCode
-from models.config_model import ConfigOrm
-from models.invite_code_model import InviteCodeOrm, InviteCodeType
-from models.user_model import UserOrm
+from models.config_model import Config, ConfigRepository
+from models.invite_code_model import InviteCode, InviteCodeRepository, InviteCodeType
+from models.user_model import User, UserRepository
+from models.database import get_session
 
 logger = logging.getLogger(__name__)
 
+
 class NotBoundError(Exception):
     """用户未绑定 Emby 账号的异常"""
+
     pass
+
 
 class UserService:
     """用户与 Emby 相关的业务逻辑层"""
@@ -31,18 +33,16 @@ class UserService:
     @staticmethod
     async def get_or_create_user_by_telegram_id(telegram_id: int) -> User:
         """通过 telegram_id 从数据库获取用户，如果不存在则创建一个默认用户"""
-        user = await UserOrm().query_one(conds=[User.telegram_id == telegram_id])
+        user = await UserRepository.get_by_telegram_id(telegram_id)
         if not user:
-            default_user = User(
+            # Create new user with parameters instead of User object
+            user = await UserRepository.create_user(
                 telegram_id=telegram_id,
                 is_admin=telegram_id in config.admin_list,
                 telegram_name=config.group_members.get(telegram_id, {}).username
                 if config.group_members.get(telegram_id)
                 else None,
             )
-            user_id = await UserOrm().add(default_user)
-            user = default_user
-            user.id = user_id
         return user
 
     @staticmethod
@@ -77,9 +77,13 @@ class UserService:
             raise Exception("在 Emby 系统中创建账号失败，请检查 Emby 服务是否正常。")
 
         emby_id = emby_user["Id"]
-        user.emby_id = emby_id
-        user.emby_name = username
-        user.enable_register = False
+        # Update user directly with UserRepository
+        await UserRepository.update_user(
+            user.id, emby_id=emby_id, emby_name=username, enable_register=False
+        )
+
+        # Reload user after update
+        user = await UserRepository.get_by_id(user.id)
 
         # 设置初始密码 & 默认Policy
         self.emby_api.set_user_password(emby_id, password)
@@ -109,13 +113,15 @@ class UserService:
         if not user.check_create_invite_code():
             raise Exception("您没有权限生成普通邀请码。")
 
-        code_objs = [
-            InviteCode(
+        # Create and store invite codes one by one
+        created_codes = []
+        for code in self.gen_register_code(count):
+            invite_code = await InviteCodeRepository.create_invite_code(
                 code=code, telegram_id=telegram_id, code_type=InviteCodeType.REGISTER
             )
-            for code in self.gen_register_code(count)
-        ]
-        return await InviteCodeOrm().bulk_add(code_objs)
+            created_codes.append(invite_code)
+
+        return created_codes
 
     async def create_whitelist_code(
         self, telegram_id: int, count: int = 1
@@ -125,13 +131,15 @@ class UserService:
         if not user.check_create_whitelist_code():
             raise Exception("您没有权限生成白名单邀请码。")
 
-        code_objs = [
-            InviteCode(
+        # Create and store whitelist codes one by one
+        created_codes = []
+        for code in self.gen_whitelist_code(count):
+            invite_code = await InviteCodeRepository.create_invite_code(
                 code=code, telegram_id=telegram_id, code_type=InviteCodeType.WHITELIST
             )
-            for code in self.gen_whitelist_code(count)
-        ]
-        return await InviteCodeOrm().bulk_add(code_objs)
+            created_codes.append(invite_code)
+
+        return created_codes
 
     async def emby_info(self, telegram_id: int) -> Tuple[User, Dict]:
         """获取当前用户在 Emby 的信息"""
@@ -140,17 +148,18 @@ class UserService:
             raise NotBoundError("该用户尚未绑定 Emby 账号。")
         emby_user = self.emby_api.get_user(str(user.emby_id))
         if not emby_user:
-            raise Exception("从 Emby 服务器获取用户信息失败，请检查 Emby 服务是否正常。")
+            raise Exception(
+                "从 Emby 服务器获取用户信息失败，请检查 Emby 服务是否正常。"
+            )
         return user, emby_user
 
     async def first_or_create_emby_config(self) -> Config:
         """获取或创建 Emby 配置。"""
-        emby_config = await ConfigOrm().query_one(conds=[Config.id == 1])
+        emby_config = await ConfigRepository.get_by_id(1)
         if not emby_config:
-            emby_config = Config(
+            emby_config = await ConfigRepository.create_config(
                 register_public_user=0, register_public_time=0, total_register_user=0
             )
-            await ConfigOrm().add(emby_config)
         return emby_config
 
     async def emby_create_user(
@@ -168,17 +177,28 @@ class UserService:
         if not await self._check_register_permission(user, emby_config):
             raise Exception("当前没有可用的注册权限或名额，创建账号被拒绝。")
 
-        async with ConfigOrm().transaction() as session:
-            if not user.enable_register and emby_config.register_public_user > 0:
-                emby_config.register_public_user -= 1
+        # Use manual session management instead of transaction context manager
+        async for session in get_session():
+            try:
+                if not user.enable_register and emby_config.register_public_user > 0:
+                    emby_config.register_public_user -= 1
 
-            emby_config.total_register_user += 1
-            new_user = await self._emby_create_user(telegram_id, username, password)
+                emby_config.total_register_user += 1
+                await ConfigRepository.update_config(
+                    emby_config.id,
+                    register_public_user=emby_config.register_public_user,
+                    total_register_user=emby_config.total_register_user,
+                )
 
-            session.add(new_user)
-            session.add(emby_config)
-            await session.commit()
-        return new_user
+                # Create user in Emby system
+                new_user = await self._emby_create_user(telegram_id, username, password)
+
+                await session.commit()
+                return new_user
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"创建用户失败: {e}")
+                raise
 
     async def _check_register_permission(self, user: User, emby_config: Config) -> bool:
         """检查用户是否有权限注册 Emby 账号"""
@@ -192,9 +212,7 @@ class UserService:
         ):
             enable_register = True
         if 0 < emby_config.register_public_time < datetime.now().timestamp():
-            await ConfigOrm().update(
-                values={"register_public_time": 0}, conds=[Config.id == 1]
-            )
+            await ConfigRepository.update_config(1, register_public_time=0)
         return enable_register
 
     async def redeem_code(self, telegram_id: int, code: str):
@@ -205,40 +223,42 @@ class UserService:
 
         user = await self.must_get_user(telegram_id)
 
-        # 使用事务块，并通过行锁防止并发问题
-        async with InviteCodeOrm().transaction() as session:
-            # 构造 SELECT 语句，并加上 FOR UPDATE 行锁
-            stmt = select(InviteCode).where(InviteCode.code == code).with_for_update()
-            result = await session.execute(stmt)
-            valid_code = result.scalars().first()
+        # Use direct session rather than transaction context manager
+        async for session in get_session():
+            try:
+                # Get invite code
+                valid_code = await InviteCodeRepository.get_by_code(code)
 
-            if not valid_code or valid_code.is_used:
-                raise Exception("该邀请码无效或已被使用。")
+                if not valid_code or valid_code.is_used:
+                    raise Exception("该邀请码无效或已被使用。")
 
-            # 根据邀请码类型执行不同的业务逻辑校验
-            if valid_code.code_type == InviteCodeType.REGISTER:
-                user.check_use_redeem_code()
-            elif valid_code.code_type == InviteCodeType.WHITELIST:
-                user.check_use_whitelist_code()
-                if user.is_emby_baned():
-                    await self.emby_unban(telegram_id)
+                # 根据邀请码类型执行不同的业务逻辑校验
+                if valid_code.code_type == InviteCodeType.REGISTER:
+                    user.check_use_redeem_code()
+                elif valid_code.code_type == InviteCodeType.WHITELIST:
+                    user.check_use_whitelist_code()
+                    if user.is_emby_baned():
+                        await self.emby_unban(telegram_id)
 
-            # 标记邀请码已使用，并记录使用时间和使用者
-            valid_code.is_used = True
-            valid_code.used_time = datetime.now().timestamp()
-            valid_code.used_user_id = telegram_id
+                # Mark code as used
+                now = int(datetime.now().timestamp())
+                await InviteCodeRepository.mark_as_used(valid_code.id, now, telegram_id)
 
-            # 根据邀请码类型更新用户状态
-            if valid_code.code_type == InviteCodeType.REGISTER:
-                user.enable_register = True
-            elif valid_code.code_type == InviteCodeType.WHITELIST:
-                user.is_whitelist = True
+                # Update user based on code type
+                if valid_code.code_type == InviteCodeType.REGISTER:
+                    await UserRepository.update_user(user.id, enable_register=True)
+                elif valid_code.code_type == InviteCodeType.WHITELIST:
+                    await UserRepository.update_user(user.id, is_whitelist=True)
 
-            session.add(valid_code)
-            session.add(user)
-            await session.commit()
+                await session.commit()
 
-        return valid_code
+                # Refresh user object after update
+                user = await UserRepository.get_by_id(user.id)
+                return valid_code
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"使用邀请码失败: {e}")
+                raise
 
     async def reset_password(self, telegram_id: int, password: str = "") -> bool:
         """重置用户的 Emby 密码。"""
@@ -265,12 +285,8 @@ class UserService:
 
         try:
             self.emby_api.ban_user(str(user.emby_id))
-            user.ban_time = int(datetime.now().timestamp())
-            user.reason = reason
-            await UserOrm().update(
-                {"ban_time": user.ban_time, "reason": reason},
-                conds=[User.id == user.id],
-            )
+            ban_time = int(datetime.now().timestamp())
+            await UserRepository.update_user(user.id, ban_time=ban_time, reason=reason)
             return True
         except Exception as e:
             logger.error(f"禁用用户失败: {e}")
@@ -290,11 +306,7 @@ class UserService:
 
         try:
             self.emby_api.set_default_policy(str(user.emby_id))
-            user.ban_time = 0
-            user.reason = ""
-            await UserOrm().update(
-                {"ban_time": 0, "reason": None}, conds=[User.id == user.id]
-            )
+            await UserRepository.update_user(user.id, ban_time=0, reason=None)
             return True
         except Exception as e:
             logger.error(f"解禁用户失败: {e}")
@@ -314,18 +326,17 @@ class UserService:
         if not emby_config:
             raise Exception("未找到全局 Emby 配置，无法设置。")
 
+        update_data = {}
         if register_public_user is not None:
-            emby_config.register_public_user = register_public_user
+            update_data["register_public_user"] = register_public_user
         if register_public_time is not None:
-            emby_config.register_public_time = register_public_time
+            update_data["register_public_time"] = register_public_time
 
-        await ConfigOrm().update(
-            values={
-                "register_public_user": emby_config.register_public_user,
-                "register_public_time": emby_config.register_public_time,
-            },
-            conds=[Config.id == 1],
-        )
+        if update_data:
+            await ConfigRepository.update_config(emby_config.id, **update_data)
+            # Refresh config after update
+            emby_config = await ConfigRepository.get_by_id(emby_config.id)
+
         return emby_config
 
     def emby_count(self) -> Dict:
