@@ -17,7 +17,6 @@ from models.database import (
 
 # Initialize logger
 logger = logging.getLogger(__name__)
-# <CURRENT_CURSOR_POSITION>
 
 
 async def _init_db() -> None:

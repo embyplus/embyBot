@@ -7,7 +7,6 @@ requires-python = ">=3.10, <3.13"
 dependencies = [
     "asyncmy>=0.2.10",
     "cryptography>=44.0.0",
-    "huidevkit[db-orm]~=0.6.0",
     "pymysql==1.1.1",
     "pyrogram",
     "python-dotenv==1.0.1",

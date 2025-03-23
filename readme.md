@@ -20,9 +20,9 @@
 git clone https://github.com/embyplus/embyBot
 cp .env.example .env
 vim .env
-
-python3 -m pip install -r requirements.txt
-python3 app.py
+wget -qO- https://astral.sh/uv/install.sh | sh
+uv sync
+uv run app.py
 ```
 
 ### 配置环境变量
