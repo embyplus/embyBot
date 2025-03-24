@@ -187,7 +187,7 @@ dependencies = [
     { name = "asyncmy" },
     { name = "cryptography" },
     { name = "pymysql" },
-    { name = "pyrogram" },
+    { name = "pyrotgfork" },
     { name = "python-dotenv" },
     { name = "pytz" },
     { name = "requests" },
@@ -202,7 +202,7 @@ requires-dist = [
     { name = "asyncmy", specifier = ">=0.2.10" },
     { name = "cryptography", specifier = ">=44.0.0" },
     { name = "pymysql", specifier = "==1.1.1" },
-    { name = "pyrogram", git = "https://github.com/rebeeh/pyrogram.git?rev=master" },
+    { name = "pyrotgfork", specifier = ">=2.2.9" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pytz", specifier = "~=2025.1" },
     { name = "requests", specifier = "==2.31.0" },
@@ -281,12 +281,16 @@ wheels = [
 ]
 
 [[package]]
-name = "pyrogram"
-version = "2.0.106"
-source = { git = "https://github.com/rebeeh/pyrogram.git?rev=master#235fb91c12bb47f7004196c95d3f70c1f53747b6" }
+name = "pyrotgfork"
+version = "2.2.9"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pyaes" },
     { name = "pysocks" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/97/91/1af8ac8edf28a72c08496d7bc87ece4d1c7fb537c63d9831b2ee05931ac4/pyrotgfork-2.2.9.tar.gz", hash = "sha256:6c44c694e5f425f5ad617d6b7f62d37b462b6194113b1380dd6866d8668f8863", size = 486317 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/7d/2f37ca4087b151e509dc945109f4d51f9aaf21186f1c97ab220c8c43ad62/pyrotgfork-2.2.9-py3-none-any.whl", hash = "sha256:cae5393df5d0c4a125b584444e1098918794326a65bf6bac6dbbc97c50c984ab", size = 4974727 },
 ]
 
 [[package]]
